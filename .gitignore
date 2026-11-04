@@ -1,0 +1,12 @@
+node_modules/
+.env*
+.muse/
+recordings/
+*.pem
+*.key
+*.log
+MEMORY.md
+evidence/*
+!evidence/nied-20150911-112705-original.jpg
+!evidence/fleet-benchmark-boundary-cases.mjs
+assets/mission-intro.png

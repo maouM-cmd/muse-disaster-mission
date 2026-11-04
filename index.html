@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MUSE MISSION | Disaster Response</title><script type="importmap">{"imports":{"three":"/vendor/three.module.js"}}</script><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<dialog id="mission-welcome" class="mission-welcome" aria-labelledby="welcome-title">
+  <div class="welcome-top"><strong>MUSE <em>MISSION</em></strong><span>災害対応シミュレーション</span><label class="language-control">言語 / Language <select id="welcome-language" aria-label="Language / 言語"><option value="ja">日本語</option><option value="en">English</option></select></label><button id="welcome-close" type="button">地図を見る</button></div>
+  <div class="welcome-body">
+    <p class="welcome-kicker" id="welcome-kicker">はじめての MUSE MISSION</p>
+    <h1 id="welcome-title">街の状況を確かめ、支援を届ける。</h1>
+    <p id="welcome-description">実地図を使って水害対応を体験します。まずは３つの流れをご案内します。</p>
+    <div id="welcome-intro" class="welcome-cards">
+      <article><span>01</span><h2>地域を選ぶ</h2><p>公開された地図から、対象の地域を選びます。</p></article>
+      <article><span>02</span><h2>配送先と出発地点</h2><p>物資を届ける施設と、出発地点を決めます。</p></article>
+      <article><span>03</span><h2>確認して開始</h2><p>複数機の動きと、共有・相談の経過を見守ります。</p></article>
+    </div>
+    <ol id="welcome-steps" class="welcome-steps" aria-label="準備の進行状況" hidden><li>地域</li><li>支援内容</li><li>配送先</li><li>出発地点</li><li>確認・開始</li></ol>
+    <section id="welcome-region" class="wizard-step" hidden><h2>どの地域で試しますか？</h2><div class="wizard-options" id="welcome-regions"><button data-area="13118" type="button">東京都 荒川区</button><button data-area="13101" type="button">東京都 千代田区</button><button data-area="13106" type="button">東京都 台東区<br><small>写真付き建物を優先（一部）</small></button></div><p id="welcome-map-status" role="status">地図データを読み込み中です。</p></section>
+    <section id="welcome-mission" class="wizard-step" hidden><h2>支援する内容を確認</h2><div class="mission-choices"><article><strong>状況確認</strong><p>公開データと仮想障害を確認します。</p></article><article class="selected"><strong>物資配送</strong><p>複数の仮想機体が施設へ向かいます。</p></article><article><strong>情報共有</strong><p>仮想障害と点検結果を機体間で共有します。</p></article></div><p>この版では、仮想の偵察機が設定済みの障害を報告し、仮想の中継機を通して配送機へ共有します。実際の観測や無線通信ではありません。</p></section>
+    <section id="welcome-destination" class="wizard-step" hidden><h2>どこへ物資を届けますか？</h2><label for="welcome-transcript">依頼文（任意・確認して修正できます）</label><textarea id="welcome-transcript" rows="2" maxlength="500" placeholder="例：原中学校に水を12箱届けて"></textarea><div class="wizard-voice"><button id="welcome-voice" type="button">音声を文字にする</button><button id="welcome-apply" type="button">文章から候補を反映</button></div><p id="welcome-voice-status" role="status">音声は文字起こしのためMetaに送信されます。個人情報は話さないでください。</p><label for="welcome-shelter">配送先の施設</label><select id="welcome-shelter"><option value="">施設を読み込み中です</option></select><div class="wizard-cargo"><label>物資<select id="welcome-supply"><option value="">指定なし</option><option value="water">飲料水</option><option value="food">食料</option><option value="blanket">毛布</option><option value="hygiene">衛生用品</option></select></label><label>数量（箱）<input id="welcome-quantity" type="number" min="1" max="10000" inputmode="numeric" placeholder="例：12"></label></div><p>施設は公開情報です。現在の開設や受け入れ状況は確認していません。</p></section>
+    <section id="welcome-origin" class="wizard-step" hidden><h2>出発地点を地図で選ぶ</h2><p>地図上の出発したい場所をクリックしてください。キーボードでは矢印キーで地図を動かし、Enterで中央の地点を選びます。</p><p id="welcome-origin-state">出発地点：未選択</p><button id="welcome-pick-origin" type="button">地図で出発地点を選ぶ</button></section>
+    <section id="welcome-confirm" class="wizard-step" hidden><h2>内容を確認して開始</h2><p id="welcome-summary"></p><label>配送する機体数 <select id="welcome-fleet"><option value="100">最大100機</option><option value="2">2機</option></select></label><label>比較シナリオ（100機モード） <select id="welcome-scenario"><option value="standard">ケースA：取得した点検結果を使う</option><option value="withhold-a">ケースB：案Aの1点を仮想的に伏せる</option></select></label><p>ケースBでは案Aの確認済み点を1点伏せて不明扱いにします。実際の取得失敗ではありません。</p><p>仮想障害が発生すると、地名を含む地図画像と点検結果をMuseに送って相談する場合があります。100機の配送では、候補なしや一時的な通信障害の際に、別の候補を点検して最大2回相談します。条件を確認できない場合は対象機を停止します。</p></section>
+    <p id="welcome-error" role="alert" hidden></p>
+    <div class="welcome-actions"><button id="welcome-map-inline" type="button">先に地図を見る</button><button id="welcome-back" type="button" hidden>戻る</button><button id="welcome-next" class="welcome-primary" type="button">準備を始める</button></div>
+    <p class="welcome-disclaimer">シミュレーションです。背景はイメージで、現在の浸水や実機の飛行状況ではありません。</p><p id="welcome-language-note" class="language-note" hidden>Some place names, source details and Muse responses may remain in Japanese. Review voice transcriptions before use.</p>
+  </div>
+</dialog>
+<main class="shell">
+  <section id="world" class="world" aria-label="水害の街と配送ドローン">
+    <canvas id="scene" aria-label="仮想の水害都市の3Dシミュレーション"></canvas>
+    <canvas id="detection-overlay" aria-hidden="true"></canvas>
+    <div id="real-map" class="real-map" aria-label="実地図と3D都市モデル" hidden><div id="map-center-cross" class="map-center-cross" aria-hidden="true" hidden></div></div>
+    <div id="origin-map-hint" class="origin-map-hint" role="status" aria-live="polite" hidden><span aria-hidden="true">⌖</span> 地図を押して出発地点を選んでください</div>
+    <div class="world-shade"></div>
+    <header class="topbar"><div class="brand"><span class="brand-mark">◈</span><div><strong>MUSE <em>MISSION</em></strong><small>DISASTER RESPONSE / SIMULATION</small></div></div><div class="topright"><label class="language-control map-language-control">言語 / Language <select id="map-language" aria-label="Language / 言語"><option value="ja">日本語</option><option value="en">English</option></select></label><span class="live-dot"></span><span id="mode-badge">試作モード</span><span class="clock" id="clock">00:00:00</span></div></header>
+    <div class="eyebrow"><span>◉</span> MISSION AREA 01 <b> / </b> FLOOD DISTRICT</div>
+    <div class="hero"><span class="chapter">PROJECT 01 / DISASTER RESPONSE</span><h1>届けるまで、<br><i>考えつづける。</i></h1><p>水に沈んだ街。AIたちは状況を見て、<br>相談し、物資を届けます。</p></div>
+    <div class="world-foot"><div><span class="label">MISSION STATUS</span><strong id="world-status">待機中</strong></div><div><span class="label">ENVIRONMENT</span><strong>浸水 / 雨上がり</strong></div><div><span class="label">WEATHER</span><strong>曇り</strong></div></div>
+    <div id="map-tag" class="map-tag"><span>↗</span> <div>EVACUATION POINT <strong>避難所 A</strong></div></div>
+    <div id="subtitle" class="subtitle" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+    <div id="map-subtitle" class="subtitle" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+    <div id="map-radio-dock" class="map-radio-dock" aria-label="実地図のAI交信">
+      <div class="map-radio-head"><strong>AI 交信 <small>迂回相談</small></strong><button id="map-sound" type="button" aria-pressed="false">読み上げ OFF</button></div>
+      <div id="map-radio-live" role="status" aria-live="polite" aria-atomic="true">仮想障害で停止後、Museに相談できます。</div>
+    </div>
+    <div id="map-mission-dock" class="map-mission-dock" aria-label="仮想便の状況" hidden>
+      <div class="map-mission-heading"><strong>仮想便 <small>SIMULATION</small></strong><button id="map-mission-more" type="button" aria-expanded="false" aria-controls="map-mission-cargo map-mission-steps map-primary-distance map-fleet-position map-mission-evidence map-dock-actions">詳細・操作</button></div>
+      <div class="map-aircraft-card map-aircraft-primary" aria-label="1号機の仮想便">
+        <div class="map-aircraft-label"><span aria-hidden="true">●</span> 1号機 <small>仮想便</small></div>
+        <p id="map-mission-destination"></p><p id="map-mission-cargo"></p>
+        <ol id="map-mission-steps" class="map-mission-steps" aria-label="1号機の仮想便の段階"><li id="map-step-0">出発</li><li id="map-step-1">障害</li><li id="map-step-2">迂回</li><li id="map-step-3">荷下ろし</li></ol>
+        <p id="map-primary-distance" class="map-mission-distance"><span>配送先までの直線（仮想位置）</span><strong id="map-mission-distance">—</strong></p>
+      </div>
+      <div id="map-fleet-card" class="map-aircraft-card map-aircraft-second" aria-label="2号機の仮想便" hidden>
+        <div class="map-aircraft-label"><span aria-hidden="true">●</span> 2号機 <small>仮想便</small></div>
+        <p id="map-fleet-state" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+        <div id="map-fleet-position" class="map-fleet-position" hidden>
+          <p class="map-mission-distance"><span id="map-fleet-distance-label"></span><strong id="map-fleet-distance">—</strong></p>
+          <progress id="map-fleet-progress" max="100" value="0" aria-label="2号機の仮想位置の目安"></progress>
+          <small>地図の矢印は仮想の進行方向</small>
+        </div>
+      </div>
+      <p id="map-mission-evidence" hidden></p><p id="map-dock-route" class="map-dock-route">経路：未開始（当初・選択案なし）</p><p id="map-dock-decision" class="map-dock-decision">選択：未選択 ／ 状態：待機中 ／ 2号機：未開始</p>
+      <p id="map-mission-state" role="status" aria-live="polite" aria-atomic="true"></p>
+      <div id="map-dock-actions" class="map-dock-actions" role="group" aria-label="仮想障害の操作" hidden>
+        <button id="map-dock-wire" type="button" aria-pressed="false">仮想電線を拡大</button>
+        <button id="map-dock-consult" type="button">Museに相談</button>
+        <small class="map-dock-note">街全体以外では先に街全体へ切り替え、もう一度押すと地名や地点が映り得る画像をMetaへ送信します。仮想障害の印は含み、電線の描画・仮想水面・2号機の方向矢印は除きます。</small>
+        <div class="map-route-comparison" aria-label="仮想迂回案の点検比較"><strong>3Dモデルの点検</strong><div><b>仮想案A</b><span id="map-route-a">点検結果を利用できません</span></div><div><b>仮想案B</b><span id="map-route-b">点検結果を利用できません</span></div><small>幅5m・仮想高度180m付近の点検。高い表面はその高度付近以上。点間・電線は未確認で、飛行の安全は判断できません。</small></div>
+        <button id="map-dock-a" type="button">仮想案Aを再生</button>
+        <button id="map-dock-b" type="button">仮想案Bを再生</button>
+      </div>
+      <button id="map-dock-stop" class="map-dock-stop" type="button" hidden>仮想移動を終了</button>
+    </div>
+    <div class="camera-controls" role="group" aria-label="カメラ視点"><button id="view-wide" type="button" aria-pressed="true">街全体</button><button id="view-follow" type="button" aria-pressed="false">ドローン追跡</button></div>
+    <div class="map-camera-controls" role="group" aria-label="実地図のカメラ視点"><button id="map-view-wide" type="button" aria-pressed="true">街全体</button><button id="map-view-follow" type="button" aria-pressed="false" disabled>1号機追跡</button><button id="map-view-second" type="button" aria-pressed="false" disabled>2号機追跡</button></div>
+    <div class="mode-controls" role="group" aria-label="表示モード"><button id="mode-simulation" type="button" aria-pressed="true">仮想配送</button><button id="mode-real" type="button" aria-pressed="false">実地図を見る</button><button id="tutorial-reopen" type="button">使い方の案内</button><button id="pilot-toggle" type="button" aria-expanded="false" aria-controls="data-pilot">地域情報</button><button id="panel-toggle" type="button" aria-expanded="true" aria-controls="map-panel">情報を閉じる</button></div>
+    <div id="consult-unsaved-banner" class="consult-unsaved-banner" role="status" hidden><span>相談記録が未保存です</span><button id="consult-unsaved-open" type="button">確認する</button></div>
+    <div id="map-team-unsaved-banner" class="team-unsaved-banner" hidden><span id="map-team-unsaved-status" role="status" aria-live="polite"></span><button id="map-team-unsaved-retry" type="button" hidden>保存を再試行</button><button id="map-team-unsaved-export" type="button" hidden>結果をファイルに保存</button><button id="map-team-unsaved-dismiss" type="button" hidden>閉じる</button></div>
+    <div id="map-banner" class="map-banner" hidden><strong id="map-area-title">東京都荒川区 ／ 実地図</strong><strong id="map-area-title-english" hidden></strong><span id="area-view-status" role="status" aria-live="polite" hidden></span><span class="map-context-note">航空写真は現在の映像ではありません。洪水は想定です。</span><span id="imagery-banner">航空写真：撮影時期未確認・現在の現場映像ではありません。</span><span id="risk-banner">洪水の想定区域は、現在の浸水状況ではありません。</span><span id="water-banner" class="water-banner" hidden>仮想の水面を表示中：実際の浸水ではありません。</span><span id="map-source-notice" role="status" aria-live="polite">データの取得状態を確認中です。</span><span id="rain-map-status" role="status" aria-live="polite" hidden></span><button id="map-banner-more" type="button" aria-expanded="false" aria-controls="area-view-status imagery-banner risk-banner water-banner rain-map-status">表示の注意</button></div>
+    <section id="data-pilot" class="data-pilot" aria-labelledby="pilot-title" hidden>
+      <div class="pilot-head"><div><small>02 / DATA PILOT</small><h2 id="pilot-title">地域の情報を確認</h2></div><button id="pilot-close" type="button" aria-label="データ確認を閉じる">×</button></div>
+      <p class="pilot-intro">公開データと人のメモを分けて表示します。実際の救助・飛行の判断には使えません。</p>
+      <p class="pilot-intro">水位・キキクル・施設のメモを複数画面で編集する場合、同じアドレスのすべての画面を最新版に再読み込みしてください。対応していないブラウザでは保存・削除できません。</p>
+      <p class="pilot-intro">記録の照合には、このブラウザ内の別の保存領域も使います。照合できない記録は上書きせず確認を求めます。</p>
+      <p id="pilot-area" class="pilot-area"></p>
+      <details id="pilot-history-recovery" class="pilot-details"><summary id="recovery-title">保存内容が一致しないとき</summary>
+        <p id="recovery-help">同じアドレスの他の画面をすべて最新版に再読み込みしてから比較してください。記録は端末内で扱い、Museには送信しません。</p>
+        <label><span id="recovery-kind-label">比較する記録</span> <select id="recovery-kind"><option value="risk">キキクル確認メモ</option><option value="river">水位の記録</option><option value="report">施設の報告</option><option value="receipt">物資受領の報告</option><option value="field">現地の浸水報告</option><option value="old-river">以前の水位メモ</option><option value="old-facility">以前の施設メモ</option><option value="consult">Muse相談の記録</option><option value="exercise">机上演習の記録</option><option value="photo">画像確認の記録</option><option value="fleet">仮想配送の記録</option><option value="historical">過去事例の確認記録</option><option value="team">2機の仮想配送の記録</option></select></label>
+        <button id="recovery-inspect" type="button">保存内容を比較</button><p id="recovery-status" role="status" aria-live="polite"></p>
+        <div id="recovery-preview" hidden><p id="recovery-privacy">施設名などが含まれます。共有や画面撮影に注意してください。</p><strong id="recovery-local-label">画面側の記録</strong><pre id="recovery-local"></pre><strong id="recovery-committed-label">照合用の記録</strong><pre id="recovery-committed"></pre><button id="recovery-download" type="button">両方をファイルに保存</button> <button id="recovery-merge" type="button" disabled>2つの記録を統合</button></div>
+        <button id="recovery-backup-download" type="button" hidden>直近の統合前の記録を保存</button>
+      </details>
+      <details id="pilot-evidence-ledger" class="pilot-details"><summary>情報の出典と時刻を一覧で見る</summary><p>表示用のIDです。情報の種類、取得状態、時刻と出典を分けて表示します。この一覧は外部に送信されません。</p><p>保存するファイルには施設名・報告の場所や確認先・日時などが含まれる場合があります。共有前に内容を確認してください。</p><p>受領報告と対応の補足メモは一覧・ファイルに含みません。</p><button id="pilot-evidence-export" type="button">この時点の一覧をファイルに保存</button><p id="pilot-evidence-export-status" role="status" aria-live="polite"></p><div id="pilot-evidence-list"></div><details><summary>保存した情報の一覧を確認</summary><p>以前保存した想定・公開情報・人の報告を参考表示します。端末内で読み取り、Museや配送には使いません。</p><label for="pilot-snapshot-file">保存した一覧ファイルを選ぶ</label><input id="pilot-snapshot-file" type="file" accept=".json,application/json" aria-describedby="pilot-snapshot-status"><button id="pilot-snapshot-clear" type="button">表示を消す</button><p id="pilot-snapshot-status" role="status" aria-live="polite"></p><div id="pilot-snapshot-preview"></div></details></details>
+      <details id="pilot-benchmark" class="pilot-details"><summary>同じ仮想データでMuseと定型ルールを比較</summary><p>架空の3件または境界条件7件、もしくは現在の地域で保存した仮想配送1件を数値だけで比較します。開始すると3件は3回、7件は7回、1件は1回Museに相談し、API利用料がかかる場合があります。地図画像・施設名・住所は送りません。仮想便の動きは変わりません。</p><p>両方に同じ数値を渡します。定型ルールは点検条件と距離の有無のみ使い、Museは全数値と文章の指示を受け取ります。少数例の比較であり、実際の救助効果は分かりません。</p><label>比較するデータ <select id="pilot-benchmark-source"><option value="fixture">固定の架空ケース3件</option><option value="boundary">境界条件の架空ケース7件（7回相談）</option><option value="saved">この地域の最新の仮想配送1件</option></select></label><button id="pilot-benchmark-start" type="button">比較を開始</button><button id="pilot-benchmark-cancel" type="button" hidden>比較を中止</button><p id="pilot-benchmark-status" role="status" aria-live="polite"></p><div id="pilot-benchmark-results"></div><button id="pilot-benchmark-export" type="button" hidden>比較結果を保存</button></details>
+      <div class="pilot-grid" aria-live="polite">
+        <div class="pilot-card"><span>▦ 3D建物</span><strong id="pilot-buildings">確認中</strong><small>国交省 PLATEAU</small></div>
+        <div class="pilot-card"><span>⌂ 避難場所</span><strong id="pilot-shelters">確認中</strong><small>国土地理院の公開一覧</small></div>
+        <div class="pilot-card"><span>☂ 大雨情報</span><strong id="pilot-weather">確認中</strong><small>気象庁の広域情報</small></div>
+        <div class="pilot-card"><span>◩ 洪水想定</span><strong id="pilot-risk">確認中</strong><small>将来の想定・現在の浸水ではない。失敗履歴は他地域を含む場合があります。</small></div>
+      </div>
+      <details class="pilot-details"><summary>気象の観測・出典・取得時刻を見る</summary>
+        <p id="pilot-observation"></p><small>観測所の地上の値であり、施設や上空の実測ではありません。</small><button id="pilot-observation-view" type="button" disabled>観測所を地図で見る</button><p id="pilot-weather-detail"></p><p id="pilot-fetch-time"></p>
+        <a href="https://www.jma.go.jp/bosai/amedas/" target="_blank" rel="noopener noreferrer">気象庁の観測を確認 ↗</a> · <a href="https://disaportal.gsi.go.jp/" target="_blank" rel="noopener noreferrer">洪水想定の出典 ↗</a>
+      </details>
+      <details class="pilot-details" id="pilot-risk-review"><summary>キキクルを開き、確認メモを残す</summary>
+        <p>気象庁の危険度分布は予測等に基づく情報です。現在の浸水の実測や飛行安全ではありません。</p>
+        <p id="pilot-risk-review-area" role="status"></p>
+        <div id="pilot-risk-review-links" hidden><a id="pilot-risk-inundation" target="_blank" rel="noopener noreferrer">気象庁の浸水キキクルを開く ↗</a> · <a id="pilot-risk-flood" target="_blank" rel="noopener noreferrer">気象庁の洪水キキクルを開く ↗</a></div>
+        <p>地域の代表点を含む地図を開きます。実際に見た地点や時刻は自動確認しません。公式画面で地点と情報の時刻を確認してください。</p>
+        <form id="pilot-risk-review-form">
+          <label>確認した種類 <select id="pilot-risk-review-product" required><option value="">選択してください</option><option value="inundation">浸水キキクル</option><option value="flood">洪水キキクル</option></select></label>
+          <label>見た表示（自己申告） <select id="pilot-risk-review-appearance" required><option value="">選択してください</option><option value="yellow">黄色</option><option value="red">赤色</option><option value="purple">紫色</option><option value="black">黒色</option><option value="other">その他の表示</option><option value="unconfirmed">確認できなかった</option></select></label>
+          <label>確認した日時 <input id="pilot-risk-review-time" type="datetime-local" required></label>
+          <label>次に確認する予定の日時（任意） <input id="pilot-risk-review-next" type="datetime-local"></label>
+          <p>再確認の予定は情報が変わらないことを保証しません。</p>
+          <button type="submit">確認メモを端末に保存</button>
+        </form>
+        <p>これは本人の申告で、公式データの自動取得・検証ではありません。色がない、確認できない、古い記録は安全を意味しません。Museには送信しません。</p>
+        <p id="pilot-risk-review-message" role="status"></p><div id="pilot-risk-review-history" aria-live="polite"></div><button id="pilot-risk-review-delete" type="button">この地域の確認メモを削除</button>
+      </details>
+      <details class="pilot-details" id="pilot-river-section"><summary>河川水位・過去の災害資料</summary>
+        <details id="pilot-flood-panel"><summary>指定河川洪水予報（全国）</summary><p>気象庁の全国フィードから取得します。長期は毎時更新・数日分、短期は毎分更新・直近少なくとも10分の掲載です。短期だけでは以前の発表を確認できません。停止や遅延があり、どちらも最新情報の保証にはなりません。訂正や取消と後続の情報は整理していません。選択地域や施設との対応は自動判定しません。一覧が空でも発表がないとは限りません。公式情報で確認してください。</p><label>確認するフィード <select id="pilot-flood-frequency"><option value="long">長期：数日分</option><option value="recent">短期：直近少なくとも10分</option></select></label><button id="pilot-flood-load" type="button">全国の掲載分を取得</button><label><input id="pilot-flood-auto" type="checkbox"> 表示中に自動更新する</label><p>短期は2分ごと、長期は1時間ごとに確認します。更新のたびに開いた電文と相談の選択は解除され、電文を含む進行中の相談も中止されます。画面を離れるか閉じると停止します。最新情報の保証はありません。</p><p id="pilot-flood-auto-status" role="status" aria-live="polite">自動更新はオフです。</p><p id="pilot-flood-status" role="status" aria-live="polite">未取得です。</p><div id="pilot-flood-results"></div><p><a href="https://www.jma.go.jp/bosai/flood/" target="_blank" rel="noopener noreferrer">気象庁の指定河川洪水予報を開く ↗</a> · <a href="https://xml.kishou.go.jp/xmlpull.html" target="_blank" rel="noopener noreferrer">フィードの提供条件 ↗</a></p></details>
+        <p>予報区域と市区町村の照合は、<a href="https://www.jma.go.jp/jma/kishou/know/bosai/keiho-update2026/tech-info/index.html" target="_blank" rel="noopener noreferrer">気象庁の2026年5月27日時点の対応表</a>を加工して使用します。2026年10月9日更新のExcelとは、区域・市区町村コードのみ照合しました。表の更新は自動確認せず、施設の浸水は判定しません。</p><p>国交省の観測所の位置と水位ページを表示します。水位の自動取得は未接続です。</p>
+        <p id="pilot-river-coverage" role="status"></p><a href="https://www.river.go.jp/" target="_blank" rel="noopener noreferrer">川の防災情報 ↗</a>
+        <p>東京都の観測所を探す場合：対象河川・観測所と時刻を公式画面で確認してください。下の国交省の観測所と同じ地点とは限りません。</p>
+        <p><a href="https://www.kasen-suibo.metro.tokyo.lg.jp/im/uryosuii/tsim0102g.html" target="_blank" rel="noopener noreferrer">東京都の雨量・水位を確認 ↗</a> · <a href="https://www.kasen-suibo.metro.tokyo.lg.jp/im/other/tsim0110g.html" target="_blank" rel="noopener noreferrer">東京都の過去データを確認 ↗</a></p>
+        <p>過去データは現在の状況ではありません。東京都のデータはアプリに自動取得・照合していません。</p>
+        <div id="pilot-river-content" hidden>
+          <label>観測所 <select id="pilot-river-select"></select></label>
+          <p>位置情報：国交省の観測所データ（現地位置とずれる場合があります）</p>
+          <p id="pilot-river-distance" role="status" aria-live="polite">施設を選ぶと観測所からの直線距離を表示します。</p>
+          <p>直線距離は目安です。河川の流れに沿った距離や、施設の浸水・安全を示すものではありません。</p>
+          <div class="pilot-actions"><button id="pilot-river-focus" type="button">観測所を地図で見る</button><a id="pilot-river-official" href="https://www.river.go.jp/" target="_blank" rel="noopener noreferrer">水位を公式ページで確認 ↗</a></div>
+          <p><a id="pilot-river-metadata" href="https://www1.river.go.jp/" target="_blank" rel="noopener noreferrer">観測所の位置・諸元の出典 ↗</a></p>
+          <details><summary>確認した水位を端末内にメモ</summary>
+            <p>手入力であり自動観測ではありません。公式ページの観測日時を入力し、利用時は必ず再確認してください。河川水位は施設の浸水深ではありません。</p>
+            <form id="pilot-river-form"><label>水位（m） <input id="pilot-river-value" type="number" step="any" required></label><label>水位の基準（本人が確認） <select id="pilot-river-datum"><option value="unknown">不明</option><option value="gauge_zero">観測所の水位標の基準面</option><option value="TP">T.P.（東京湾平均海面）</option><option value="AP">A.P.（荒川工事基準面）</option><option value="other">その他の基準</option></select></label><p>基準の申告は未検証です。基準が異なる水位は直接比較できません。不明な場合は不明を選んでください。</p><label>観測日時 <input id="pilot-river-time" type="datetime-local" required></label><label>次に確認する予定の日時（任意） <input id="pilot-river-review" type="datetime-local"></label><p>日時はこの端末の時刻です。確認予定は水位が変わらないことを保証しません。</p><div class="pilot-actions"><button type="submit">端末に記録</button></div></form>
+            <p id="pilot-river-message" role="status" aria-live="polite"></p>
+            <p id="pilot-river-note" role="status"></p><button id="pilot-river-delete" type="button">以前の水位メモを削除</button>
+            <p>新しい記録は観測所ごとに最大20件を保存し、異なる値も残します。個人情報は入力しません。</p>
+            <div id="pilot-river-history" aria-live="polite"></div><button id="pilot-river-history-delete" type="button">この観測所の新しい記録を削除</button>
+          </details>
+        </div>
+        <p><a href="https://cyberjapandata.gsi.go.jp/help/intro/municipality/katuyo.html" target="_blank" rel="noopener noreferrer">国土地理院：過去災害の写真・地図 ↗</a>（過去の事例。現在の現場映像ではありません）</p>
+      </details>
+      <details id="historical-flood-case" class="pilot-details"><summary>過去の水害写真を比較（2015年・常総）</summary>
+        <p>過去の災害資料です。現在選択中の地域や今の浸水状況ではありません。同じ位置の画像を比較しますが、撮影範囲・画質・雲などの違いがあります。</p>
+        <button id="historical-flood-open" class="area-load" type="button">写真を大きく見る</button>
+        <div class="historical-flood-grid"><figure><img id="historical-flood-image-3" alt="常総地区・2015年9月11日の防災科研の航空写真地図（一部）、時間帯要確認" loading="lazy"><figcaption>2015年9月11日・時間帯要確認<br>防災科研・常総地区（一部）<br><span id="historical-flood-status-3" role="status">未取得</span></figcaption></figure><figure><img id="historical-flood-image-1" alt="常総地区・2015年9月11日午後の国土地理院の正射画像（一部）" loading="lazy"><figcaption>2015年9月11日 午後<br>国土地理院・常総地区（一部）<br><span id="historical-flood-status-1" role="status">未取得</span></figcaption></figure><figure><img id="historical-flood-image-2" alt="常総地区・2015年9月15日午前の国土地理院の正射画像（一部）" loading="lazy"><figcaption>2015年9月15日 午前<br>国土地理院・常総地区（一部）<br><span id="historical-flood-status-2" role="status">未取得</span></figcaption></figure></div>
+        <p>画像は同一の地図タイル範囲です。撮影の正確な時刻と元画像の解像度は未確認。表示が空白でも被害や浸水がない証拠にはなりません。</p>
+        <p>防災科研と国土地理院の写真は正確な撮影時刻・位置精度が未確認で、地図上で位置がずれる場合があります。画像比較は浸水の正解判定ではありません。</p><p>防災科研の写真地図の時間帯は資料の記載を照合中です。詳しくは拡大画面をご確認ください。</p>
+        <p><a href="https://ecom-plat.jp/nied-cr/index.php?gid=10132" target="_blank" rel="noopener noreferrer">防災科学技術研究所：写真・利用条件 ↗</a> · <a href="https://creativecommons.org/licenses/by/2.1/jp/" target="_blank" rel="noopener noreferrer">CC BY 2.1 JP ↗</a></p>
+        <p><a href="https://www.gsi.go.jp/BOUSAI/H27.taihuu18gou.html" target="_blank" rel="noopener noreferrer">国土地理院：災害資料・画像の出典 ↗</a> · <a href="https://www.gsi.go.jp/common/000107662.pdf" target="_blank" rel="noopener noreferrer">9月11日13時の推定浸水範囲 ↗</a></p>
+        <p>推定範囲は画像等から判読された参考資料で、把握できない範囲があります。画像の見た目との自動照合や正解判定はしていません。</p>
+        <p>別の調査：浸水痕跡の現地調査（後日の計測・最大浸水深の推定）。撮影時の水位や写真の正解を直接示すものではありません。</p>
+        <p><a href="https://www.dpri.kyoto-u.ac.jp/news/6105/" target="_blank" rel="noopener noreferrer">京都大学：現地調査と推定の第二報 ↗</a> · <a href="https://ecom-plat.jp/nied-cr/group.php?gid=10129" target="_blank" rel="noopener noreferrer">防災科研：常総市の現地調査 ↗</a></p>
+      </details>
+      <details id="historical-mabi-case" class="pilot-details"><summary>過去の水害写真を比較（2018年・真備町）</summary>
+        <p>2018年7月豪雨・岡山県倉敷市真備町周辺の過去の資料です。現在の浸水や、選択中の地域の状況ではありません。</p>
+        <button id="historical-mabi-open" class="area-load" type="button">真備町の写真を大きく見る</button>
+        <div class="historical-flood-grid"><figure><img id="historical-mabi-image-1" alt="2018年7月9日撮影、真備町周辺の国土地理院正射画像の一部" loading="lazy"><figcaption>2018年7月9日撮影／7月11日公開<br><span id="historical-mabi-status-1" role="status">未取得</span></figcaption></figure><figure><img id="historical-mabi-image-2" alt="2018年7月11日撮影、真備町周辺の国土地理院正射画像の一部" loading="lazy"><figcaption>2018年7月11日撮影／7月13日公開<br><span id="historical-mabi-status-2" role="status">未取得</span></figcaption></figure></div>
+        <p>写真は同じ地図タイルの範囲です。撮影の正確な時刻と元画像の解像度は未確認。雲・歪みや欠けた場所があり、空白は浸水がない証拠ではありません。</p>
+        <p><a href="https://www.gsi.go.jp/BOUSAI/H30.taihuu7gou.html" target="_blank" rel="noopener noreferrer">国土地理院：災害資料 ↗</a> · <a href="https://www.gsi.go.jp/common/000216843.pdf" target="_blank" rel="noopener noreferrer">推定浸水範囲の変化 ↗</a> · <a href="https://cyberjapandata.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">画像の提供情報 ↗</a></p>
+        <p>推定図は航空写真等を使って作成されており、写真から独立した正解データではありません。現地踏査はなく、把握できない範囲や誤差があります。</p>
+      </details>
+      <div class="pilot-unknown"><strong>未確認</strong> 現在の浸水・電線・上空の安全・施設の受入状況</div>
+      <div class="pilot-details"><strong>画像内の障害物候補</strong><p>利用権限のある画像を選び、候補枠と元画像を比べられます。</p><button id="photo-scan-open" type="button" class="area-load">画像を選んで確認</button></div>
+      <details id="pilot-infrastructure-reports" class="pilot-details"></details>
+      <details id="pilot-infrastructure-sources" class="pilot-details"><summary>電柱・電線の情報源を調べる</summary>
+        <p>公開ページの調査結果（2026年11月4日確認）です。アプリは設備情報を取得していません。電線の位置・高さ・災害後の状態は不明です。</p>
+        <p>荒川区の2025年PLATEAU目録では都市設備（frn）が列挙されていません。目録だけの確認で、実際に設備がないという意味ではありません。</p>
+        <p><a href="https://www.tepco.co.jp/pg/consignment/buriedobject/index-j.html" target="_blank" rel="noopener noreferrer">東京電力：設備照会の案内 ↗</a> · <a href="https://www.tepconet.co.jp/utility/index.html" target="_blank" rel="noopener noreferrer">電柱位置検索サービス（有料） ↗</a></p>
+        <p><a href="https://www.ntt-east.co.jp/contact/pole_cable_answer.html" target="_blank" rel="noopener noreferrer">NTT東日本：電柱・ケーブルの窓口 ↗</a> · <a href="https://www.mlit.go.jp/plateau/learning/tpc32-2/" target="_blank" rel="noopener noreferrer">PLATEAUの電柱・電線の説明例 ↗</a></p>
+        <p>提供範囲・精度・更新・利用条件・災害時の変更・AI送信可否は管理者への確認が必要です。窓口の案内はデータ提供の約束ではありません。</p>
+      </details>
+      <div class="pilot-details"><strong>机上演習</strong><p>施設や通信の変化を、訓練用の情報で確認します。</p><button id="exercise-open" type="button" class="area-load">演習を開く</button></div>
+      <details class="pilot-details pilot-report"><summary>洪水想定と現地報告を比べる</summary>
+        <p>洪水想定は将来の条件に基づく資料です。現地報告は人の入力で、実際に確認できた情報かアプリは検証しません。条件や日時が異なれば結果が違うこともあります。</p>
+        <p id="flood-comparison-name">施設を選択してください。</p>
+        <div id="flood-compare-grid" class="flood-compare-grid" aria-label="洪水想定と現地報告"><div><strong>公開：洪水想定</strong><p id="flood-comparison-forecast" role="status">未確認</p><a href="https://disaportal.gsi.go.jp/hazardmap/copyright/opendata.html" target="_blank" rel="noopener noreferrer">公開資料の出典 ↗</a></div><div><strong>人の入力：現地報告</strong><p id="flood-comparison-reports" role="status" aria-live="polite">未確認</p></div></div>
+        <details><summary>施設の河川別の洪水想定を見る</summary><p>選択した公開施設の座標を国土地理院の浸水ナビへ送り、河川ごとの想定最大規模の浸水深を照会します。現在の浸水ではなく、対象外や欠測もあります。結果はMuseや配送に自動で使いません。</p><button id="gsi-scenario-load" type="button" disabled>選択施設の想定を取得</button><p id="gsi-scenario-status" role="status" aria-live="polite">施設を選んでください。</p><ul id="gsi-scenario-results"></ul><p id="gsi-range-comparison">2つの資料を確認すると数値を照らし合わせます。</p><p><a href="https://suiboumap.gsi.go.jp/" target="_blank" rel="noopener noreferrer">国土地理院：浸水ナビ ↗</a> · <a href="https://suiboumap.gsi.go.jp/joken.html" target="_blank" rel="noopener noreferrer">想定の条件と対象河川 ↗</a></p></details>
+        <details><summary>現地報告を追加する</summary>
+          <p>受け取った報告をこの端末に保存します。施設・関係機関への送信や飛行判断には使いません。個人名や連絡先は入力しないでください。</p>
+          <form id="flood-field-form">
+            <label>報告内容 <select id="flood-field-status" required><option value="">選択してください</option><option value="water_seen">水が見えたという報告</option><option value="no_water_seen">水が見えなかったという報告</option><option value="uncertain">状況を確認できないという報告</option></select></label>
+            <label>報告の対象 <select id="flood-field-scope" required><option value="">選択してください</option><option value="facility_point">選択施設の一点</option><option value="nearby_road">選択施設付近の道路</option><option value="unspecified">対象範囲は不明</option></select></label>
+            <label>報告された観察日時 <input id="flood-field-time" type="datetime-local" required></label><label>再確認が必要になる期限 <input id="flood-field-expiry" type="datetime-local" required></label>
+            <label>報告元の組織 <input id="flood-field-organization" maxlength="100" required placeholder="例：施設管理者"></label><label>確認方法・出典 <input id="flood-field-source" maxlength="150" required placeholder="例：電話"></label>
+            <label>対象や状況の補足 <input id="flood-field-note" maxlength="300"></label>
+            <p>同じ施設につき最大20件まで保存します。水が見えなかったという報告は、浸水がないことや安全を示しません。</p>
+            <div class="pilot-actions"><button type="submit">現地報告を保存</button><button id="flood-field-delete" type="button">この施設の現地報告をすべて削除</button></div>
+          </form><p>読み取れない記録も元の内容を保存できます。施設名や確認先などが含まれるため、共有に注意してください。</p><button id="flood-field-export" type="button" disabled>現地報告の元データを保存</button><p id="flood-field-message" role="status" aria-live="polite"></p>
+        </details>
+      </details>
+      <details class="pilot-details pilot-report"><summary>施設の受け入れ報告（期限付き）</summary>
+        <p>人が確認した内容をこの端末に記録します。施設には送信されず、飛行判断には使われません。個人名・連絡先は入力しないでください。</p>
+        <p id="facility-report-name">施設を選択してください。</p><p id="facility-report-current" role="status" aria-live="polite"></p>
+        <form id="facility-report-form">
+          <label>訂正する元の報告（任意） <select id="facility-report-correction"><option value="">新しい独立した報告</option></select></label>
+          <p>訂正も未検証の申告です。元の報告は削除されず、両方を確認できます。</p>
+          <label>回答 <select id="facility-report-status" required><option value="">選択してください</option><option value="checking">確認中</option><option value="available">受け入れ可能との報告</option><option value="conditional">条件付きとの報告</option><option value="unavailable">受け入れ不可との報告</option></select></label>
+          <label>確認した日時 <input id="facility-report-time" type="datetime-local" required></label>
+          <label>再確認が必要になる期限 <input id="facility-report-expiry" type="datetime-local" required></label>
+          <label>確認先の組織 <input id="facility-report-organization" maxlength="100" required placeholder="例：施設管理者"></label>
+          <label>確認方法・出典 <input id="facility-report-source" maxlength="150" required placeholder="例：電話"></label>
+          <label>物資（任意） <select id="facility-report-supply"><option value="">未指定</option><option value="water">飲料水</option><option value="food">食料</option><option value="blanket">毛布</option><option value="hygiene">衛生用品</option></select></label>
+          <label>数量（箱・任意） <input id="facility-report-quantity" type="number" min="1" max="10000" step="1"></label>
+          <label>着地点の報告 <select id="facility-report-landing"><option value="unknown">未確認</option><option value="clear_reported">使用可能との報告</option><option value="unusable_reported">使用不可との報告</option></select></label>
+          <label>条件・補足 <input id="facility-report-condition" maxlength="300" placeholder="条件付きの場合は入力"></label>
+          <p>報告は施設ごとに最大20件を端末に保存し、異なる内容も残します。</p>
+          <div class="pilot-actions"><button type="submit">報告を保存</button><button id="facility-report-delete" type="button">この施設の報告をすべて削除</button></div>
+        </form><p>記録を読み取れない場合も、端末にある元の内容を保存できます。施設名や確認先が含まれるため、共有に注意してください。</p><button id="facility-report-export" type="button" disabled>施設報告の元データを保存</button><p id="facility-report-message" role="status" aria-live="polite"></p>
+      </details>
+      <details class="pilot-details pilot-report"><summary>物資の受領報告</summary>
+        <p>施設側など人からの報告を端末に記録します。仮想機体の到着・荷下ろしだけでは受領になりません。施設への送信や本人確認は行いません。</p>
+        <p id="facility-receipt-name">施設を選択してください。</p><p id="facility-receipt-current" role="status" aria-live="polite"></p>
+        <form id="facility-receipt-form">
+          <label>受領状態 <select id="facility-receipt-status" required><option value="">選択してください</option><option value="unconfirmed">未確認</option><option value="not_received">未着との報告</option><option value="received">全数受領との報告</option><option value="partial">一部受領との報告</option><option value="damaged">破損ありとの報告</option></select></label>
+          <label>報告された日時 <input id="facility-receipt-time" type="datetime-local" required></label>
+          <label>報告元・確認方法 <input id="facility-receipt-source" maxlength="150" required placeholder="例：施設管理者への電話"></label>
+          <label>物資 <select id="facility-receipt-supply" required><option value="">選択してください</option><option value="water">飲料水</option><option value="food">食料</option><option value="blanket">毛布</option><option value="hygiene">衛生用品</option></select></label>
+          <label>予定数量（箱） <input id="facility-receipt-expected" type="number" min="1" max="10000" step="1" required></label>
+          <label>報告された受領数量（箱） <input id="facility-receipt-received" type="number" min="0" max="10000" step="1"></label>
+          <label>不足・破損などの補足 <input id="facility-receipt-note" maxlength="300"></label>
+          <p>未確認では受領数量を空欄にし、未着では0を入力します。施設ごとに最大20件、端末内に残ります。個人名・連絡先は入力しないでください。</p>
+          <div class="pilot-actions"><button type="submit">受領報告を保存</button><button id="facility-receipt-delete" type="button">この施設の受領報告を削除</button></div>
+        </form><button id="facility-receipt-export" type="button" disabled>受領報告の元データを保存</button><p>保存ファイルには施設名や確認先が含まれるため、共有に注意してください。</p><p id="facility-receipt-message" role="status" aria-live="polite"></p>
+        <details><summary>受領後の対応を記録</summary>
+          <p>人による予定・実施の申告を端末に残します。施設への連絡や再配送は実行されません。個人名・連絡先は入力しないでください。</p>
+          <form id="facility-followup-form">
+            <label>対象の受領報告 <select id="facility-followup-target" required><option value="">受領報告を選んでください</option></select></label>
+            <label>対応 <select id="facility-followup-kind" required><option value="">選択してください</option><option value="confirm">状況を再確認</option><option value="redelivery">再配送を検討</option><option value="handoff">人への引き継ぎ</option></select></label>
+            <label>状態 <select id="facility-followup-state" required><option value="">選択してください</option><option value="planned">予定・検討中</option><option value="reported_done">対応したとの申告</option><option value="cancelled">取りやめたとの申告</option></select></label>
+            <label>補足（任意・200文字以内） <input id="facility-followup-note" maxlength="200"></label>
+            <button type="submit">対応を記録</button>
+          </form><p id="facility-followup-message" role="status" aria-live="polite"></p>
+        </details>
+      </details>
+      <details class="pilot-details pilot-report"><summary>以前の簡易メモ（期限なし）</summary>
+        <p id="pilot-facility">地図や施設一覧から施設を選んでください。</p><p id="pilot-facility-flood"></p>
+        <p>人が確認した内容の端末内メモです。自動で施設の受入を確認する機能ではありません。個人名や連絡先は入力しないでください。</p>
+        <form id="pilot-form">
+          <label>確認結果 <select id="pilot-report-status" required><option value="">選択してください</option><option value="available">受入可能と確認した</option><option value="unavailable">受入不可と確認した</option></select></label>
+          <label>確認した日時 <input id="pilot-report-time" type="datetime-local" required></label>
+          <label>確認先・出典 <input id="pilot-report-source" maxlength="150" required placeholder="例：施設への電話"></label>
+          <div class="pilot-actions"><button type="submit">この端末に保存</button><button id="pilot-delete" type="button">メモを削除</button></div>
+        </form><button id="pilot-export" type="button" disabled>施設メモの元データを保存</button><p>ファイルには施設名や確認先が含まれるため、共有に注意してください。</p><p id="pilot-report-message" role="status" aria-live="polite"></p><p id="pilot-report-result" role="status" aria-live="polite"></p>
+      </details>
+    </section>
+    <dialog id="exercise-dialog" class="photo-scan-dialog" aria-labelledby="exercise-title">
+      <header><div><small>TABLETOP / TRAINING</small><h2 id="exercise-title">状況の変化を確認する</h2></div><form method="dialog"><button type="submit">閉じる</button></form></header>
+      <p>これは架空の訓練です。実際の施設・地図・配送には反映されず、回答の正誤や安全性を判定しません。</p>
+      <label>演習を選ぶ<select id="exercise-scenario"><option value="facility-refused">施設の受け入れ不可と通信断</option><option value="conflicting-reports">食い違う報告と期限切れ</option></select></label>
+      <button id="exercise-start" type="button">演習を始める</button>
+      <section id="exercise-run" hidden aria-label="演習の状況">
+        <p id="exercise-initial"></p><button id="exercise-reveal" type="button">状況の変化を見る</button><p id="exercise-update" role="status"></p>
+        <form id="exercise-form" hidden>
+          <fieldset><legend>気づいた情報（自己申告・複数選択可）</legend>
+            <label><input type="checkbox" name="exercise-observed" value="facility"> 施設の受け入れ</label>
+            <label><input type="checkbox" name="exercise-observed" value="communications"> 通信の状態</label>
+            <label><input type="checkbox" name="exercise-observed" value="age"> 情報の期限</label>
+            <label><input type="checkbox" name="exercise-observed" value="conflict"> 報告の食い違い</label>
+            <label><input type="checkbox" name="exercise-observed" value="flight"> 機体の状況</label>
+          </fieldset>
+          <label>次に取る行動（自己申告）<select id="exercise-decision" required><option value="">選択してください</option><option value="hold">保留して情報を整理する</option><option value="confirm">関係先への確認を想定する</option><option value="alternate">別案を検討する</option></select></label>
+          <label>振り返りメモ（任意・300文字以内）<textarea id="exercise-notes" maxlength="300" rows="3"></textarea></label>
+          <p>メモに個人名・連絡先を入れないでください。演習結果はこの端末に最大20件保存し、外部には送信しません。経過時間には中断時間も含まれます。</p>
+          <p>表示した訓練文・言語・時刻も端末に保存します。同じアドレスで開いている他の画面も最新版に更新してください。</p>
+          <button type="submit">演習を記録</button>
+        </form>
+      </section>
+      <p id="exercise-status" role="status" aria-live="polite"></p>
+      <details><summary>この端末の演習記録</summary><p>記録とメモを書き出せます。共有前に内容を確認してください。同じアドレスの他の画面も最新版に更新してください。</p><details><summary>演習の集計を見る</summary><div id="exercise-summary" role="status" aria-live="polite"></div><button id="exercise-summary-export" type="button" disabled>集計を書き出す</button><p>集計にメモや日時は含めません。件数が少ない場合は人が推測されることもあるため、共有前に確認してください。</p></details><div id="exercise-history"></div><button id="exercise-export" type="button">演習記録を書き出す</button> <button id="exercise-delete" type="button">演習記録をすべて削除</button></details>
+      <form id="exercise-review-form" hidden>
+        <h3>観察した人の記録</h3><p id="exercise-review-target"></p><p>参加者の自己申告とは別に記録します。本人や所属を識別する情報は入力しないでください。観察できなかった場合は不明を選んでください。</p>
+        <label>何について <select id="exercise-review-focus" required><option value="">選択してください</option><option value="facility">施設の受け入れ</option><option value="communications">通信の状態</option><option value="age">情報の期限</option><option value="conflict">報告の食い違い</option><option value="flight">機体の状況</option></select></label>
+        <label>観察した様子 <select id="exercise-review-observed" required><option value="">選択してください</option><option value="acknowledged">言及を観察した</option><option value="not_acknowledged">言及を観察しなかった</option><option value="uncertain">不明・観察できなかった</option></select></label>
+        <label>負荷（参加者の自己申告） <select id="exercise-review-workload" required><option value="">選択してください</option><option value="not_asked">聞いていない・不明</option><option value="light">軽い</option><option value="moderate">普通</option><option value="high">重い</option></select></label>
+        <label>混乱した点などのメモ（任意・300文字以内） <textarea id="exercise-review-note" maxlength="300" rows="3"></textarea></label>
+        <p>言及を観察しなかったことは、気づかなかったことの証明ではありません。この端末に最大10件保存します。内容は本人確認されず、能力や安全性の判定ではありません。</p><button type="submit">観察を保存</button> <button id="exercise-review-cancel" type="button">記入をやめる</button>
+      </form><p id="exercise-review-status" role="status" aria-live="polite"></p>
+    </dialog>
+    <dialog id="historical-mabi-dialog" class="historical-flood-dialog" aria-labelledby="historical-mabi-title">
+      <header><div><small>HISTORICAL CASE / 2018</small><h2 id="historical-mabi-title">2018年・真備町周辺の水害写真</h2></div><form method="dialog"><button type="submit">閉じる</button></form></header>
+      <p>過去の同じ範囲の写真です。現在選択中の地域や今の浸水状況ではありません。</p>
+      <div class="historical-flood-grid"><figure><div class="historical-image-frame"><img id="historical-mabi-large-1" alt="2018年7月9日撮影、真備町周辺の国土地理院正射画像の一部"><span id="historical-mabi-marker-1" class="historical-point" aria-hidden="true" hidden></span></div><figcaption>2018年7月9日撮影／7月11日公開<br><span id="historical-mabi-large-status-1" role="status">未取得</span></figcaption></figure><figure><div class="historical-image-frame"><img id="historical-mabi-large-2" alt="2018年7月11日撮影、真備町周辺の国土地理院正射画像の一部"><span id="historical-mabi-marker-2" class="historical-point" aria-hidden="true" hidden></span></div><figcaption>2018年7月11日撮影／7月13日公開<br><span id="historical-mabi-large-status-2" role="status">未取得</span></figcaption></figure></div>
+      <p id="mabi-trace-description">◎ 真備分署の概略位置。防災科学技術研究所の報告の座標を写真タイル上に重ねています。別の研究報告では、同分署の2018年7月20日撮影の写真に浸水痕跡412cmと記載されています。座標と痕跡位置の厳密な一致、画像の位置精度、写真撮影時の水位は未確認です。痕跡は現在の浸水を示しません。</p>
+      <p><a href="https://repository.exst.jaxa.jp/dspace/bitstream/a-is/1037273/1/AA2140166000.pdf" target="_blank" rel="noopener noreferrer">防災科研：座標の出典 ↗</a> · <a href="https://www.jsnds.org/ssk/ssk_38_2_147.pdf" target="_blank" rel="noopener noreferrer">研究報告：浸水痕跡 ↗</a></p>
+      <p>撮影の正確な時刻と元画像の解像度は未確認。画像の歪み、雲、欠けた範囲があります。この写真はMuseへ自動送信しません。</p><div id="historical-review-mabi"></div>
+      <p>推定図は航空写真等を使って作成されており、写真から独立した正解データではありません。現地踏査はなく、把握できない範囲や誤差があります。</p>
+      <p id="mabi-independent-context">別の現地調査：2018年7月17日、国土技術研究センターが真備町の被災状況を調査しました。 <a id="mabi-field-report" href="https://www.jice.or.jp/reports/disaster/12" target="_blank" rel="noopener noreferrer">現地調査報告 ↗</a> 調査地点と写真タイル・撮影時刻の一致は未確認で、写真の正解とは扱えません。</p>
+      <p>国交省は2018年7月11日、真備町の宅地・生活道路の浸水が概ね解消したと発表しました。写真の地点・撮影時刻との一致は未確認です。 <a href="https://www.mlit.go.jp/report/press/mizukokudo04_hh_000073.html" target="_blank" rel="noopener noreferrer">国交省の発表 ↗</a></p>
+      <p><a href="https://www.gsi.go.jp/BOUSAI/H30.taihuu7gou.html" target="_blank" rel="noopener noreferrer">国土地理院：災害資料 ↗</a> · <a href="https://www.gsi.go.jp/common/000216843.pdf" target="_blank" rel="noopener noreferrer">推定浸水範囲の変化 ↗</a> · <a href="https://cyberjapandata.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">画像の提供情報 ↗</a></p>
+    </dialog>
+    <dialog id="photo-scan-dialog" class="photo-scan-dialog" aria-labelledby="photo-scan-title">
+      <header><div><small>IMAGE REVIEW / SAM 3.1</small><h2 id="photo-scan-title">画像内の電線候補を確認</h2></div><form method="dialog"><button type="submit">閉じる</button></form></header>
+      <p>利用権限のある画像を選んでください。「SAMに送信」を押すと画像をMetaへ送信します。人や住所などが写っていないか確認してください。</p>
+      <p>候補枠は画像内の目安です。見逃し・誤検出があり、実際の位置・高さ・飛行の安全は分かりません。画像内以外は未確認です。</p>
+      <label class="photo-file-label">画像を選択（PNG・JPEG・WebP、10 MB以下） <input id="photo-scan-file" type="file" accept="image/png,image/jpeg,image/webp"></label>
+      <div class="photo-meta"><label>画像の種類（申告） <select id="photo-scan-kind"><option value="unknown">不明</option><option value="field">現地の画像</option><option value="historical">過去の画像</option><option value="training">訓練・仮想画像</option></select></label><label>撮影日時（任意） <input id="photo-scan-time" type="datetime-local"></label><label>視界・遮蔽（申告） <select id="photo-scan-visibility"><option value="unknown">不明</option><option value="clear">目立つ遮蔽なし</option><option value="obscured">遮蔽・悪天候・暗さあり</option></select></label></div>
+      <details><summary>見えにくい条件を記録（任意）</summary><p>気づいた項目を選びます。選ばなかった項目や画像の外も確認済みにはなりません。</p><fieldset id="photo-scan-limitations"><legend>見えにくさの申告</legend><label><input type="checkbox" value="occluded"> 建物や樹木の陰</label><label><input type="checkbox" value="thin_wires"> 細い線や遠方が見えにくい</label><label><input type="checkbox" value="lighting"> 逆光・暗さ・雨など</label><label><input type="checkbox" value="blur"> ぼけ・低解像度</label></fieldset></details>
+      <div class="photo-meta"><label>画像の提供元・資料名（任意） <input id="photo-scan-source" maxlength="160" autocomplete="off"></label><label>Metaへの画像送信の許可（申告） <select id="photo-scan-permission"><option value="unknown">不明</option><option value="allowed">許可を確認した</option><option value="disallowed">許可されていない</option></select></label></div><p>提供元は組織名や公開資料名を入力し、氏名・連絡先は入力しないでください。許可の申告は自動検証されません。提供元と利用条件を確認してください。</p><p>送信許可が不明な場合は画像を送信できません。</p>
+      <details><summary>撮影位置・方向などを申告（任意）</summary><p>撮影者から確認できた場合のみ入力してください。数値や方向の正確さは検証しません。</p><div class="photo-meta"><label>撮影位置の緯度 <input id="photo-scan-lat" type="number" min="-90" max="90" step="any" inputmode="decimal"></label><label>撮影位置の経度 <input id="photo-scan-lon" type="number" min="-180" max="180" step="any" inputmode="decimal"></label><label>位置の誤差（m・任意） <input id="photo-scan-accuracy" type="number" min="0.01" max="100000" step="any" inputmode="decimal"></label><label>撮影方向（概略） <select id="photo-scan-direction"><option value="unknown">不明</option><option value="north">北</option><option value="east">東</option><option value="south">南</option><option value="west">西</option></select></label><label>カメラの校正 <select id="photo-scan-calibration"><option value="unknown">不明</option><option value="reported">実施したとの申告</option><option value="not_done">未実施との申告</option></select></label></div><p>緯度と経度は両方を入力してください。位置は撮影地点の申告で、候補の位置ではありません。方向は画像の範囲や死角を示しません。</p></details>
+      <p>撮影条件は利用者の申告で、Metaへ送りません。保存しない場合はこの画面を閉じると消えます。候補の実際の位置・高さ、画像外の範囲は未確認です。</p>
+      <div class="photo-scan-actions"><button id="photo-scan-send" type="button" disabled>SAMに送信</button><button id="photo-scan-clear" type="button">画像と結果を消す</button></div>
+      <p id="photo-scan-status" role="status" aria-live="polite">画像を選択してください。</p>
+      <div id="photo-scan-previews" class="photo-scan-previews" hidden><figure><canvas id="photo-scan-original" aria-label="送信する縮小画像"></canvas><figcaption>送信画像（縮小・写真の付加情報を除去）</figcaption></figure><figure><canvas id="photo-scan-overlay" aria-label="同じ画像上のSAM候補枠"></canvas><figcaption>候補枠（マスクや地図上の位置ではありません）</figcaption></figure></div>
+      <p id="photo-scan-meta-result" role="status"></p>
+      <div class="photo-scan-actions"><button id="photo-review-save" type="button" disabled>撮影条件と候補を端末に保存</button></div>
+      <p>保存には申告した撮影位置と候補枠、元画像の照合用情報を含みます。画像自体は保存しません。同じ元画像を再選択すると保存済みの候補を確認できます。照合に対応しない場合は条件と件数だけ保存します。候補0件は障害物がないことを意味しません。</p>
+      <p id="photo-review-message" role="status" aria-live="polite"></p>
+      <details><summary>保存した画像確認の記録</summary><p>端末内の位置情報です。共有や画面撮影に注意してください。最大20件を保存します。</p><div id="photo-review-history"></div><button id="photo-review-delete" type="button">画像確認の記録をすべて削除</button></details>
+    </dialog>
+    <dialog id="historical-flood-dialog" class="historical-flood-dialog" aria-labelledby="historical-flood-title">
+      <header><div><small>HISTORICAL CASE / 2015</small><h2 id="historical-flood-title">2015年・常総地区の水害写真</h2></div><form method="dialog"><button type="submit">閉じる</button></form></header>
+      <p>過去の同じ範囲の写真です。現在選択中の地域や今の浸水状況ではありません。</p>
+      <div class="historical-flood-grid"><figure><img id="historical-flood-large-3" alt="常総地区・2015年9月11日の防災科研の航空写真地図（一部）、時間帯要確認"><figcaption>2015年9月11日・時間帯要確認<br>防災科研・常総地区（一部）<br><span id="historical-flood-large-status-3" role="status">未取得</span></figcaption></figure><figure><img id="historical-flood-large-1" alt="常総地区・2015年9月11日午後の国土地理院の正射画像（一部）"><figcaption>2015年9月11日 午後<br>国土地理院・常総地区（一部）<br><span id="historical-flood-large-status-1" role="status">未取得</span></figcaption></figure><figure><img id="historical-flood-large-2" alt="常総地区・2015年9月15日午前の国土地理院の正射画像（一部）"><figcaption>2015年9月15日 午前<br>国土地理院・常総地区（一部）<br><span id="historical-flood-large-status-2" role="status">未取得</span></figcaption></figure></div>
+      <p>防災科研と国土地理院の写真は正確な撮影時刻・位置精度が未確認で、地図上で位置がずれる場合があります。画像比較は浸水の正解判定ではありません。</p>
+      <p><a href="https://ecom-plat.jp/nied-cr/index.php?gid=10132" target="_blank" rel="noopener noreferrer">防災科学技術研究所：写真・利用条件 ↗</a> · <a href="https://creativecommons.org/licenses/by/2.1/jp/" target="_blank" rel="noopener noreferrer">CC BY 2.1 JP ↗</a></p>
+      <p>正確な撮影時刻・元画像の解像度は未確認。範囲や雲等により見えない場所があります。この写真はMuseへ自動送信しません。</p>
+      <p><a href="https://www.gsi.go.jp/BOUSAI/H27.taihuu18gou.html" target="_blank" rel="noopener noreferrer">国土地理院の資料 ↗</a> · <a href="https://www.gsi.go.jp/common/000107662.pdf" target="_blank" rel="noopener noreferrer">9月11日13時の推定浸水範囲 ↗</a> · <a href="https://cyberjapandata.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">画像の提供情報 ↗</a></p>
+      <p>別の調査：浸水痕跡の現地調査（後日の計測・最大浸水深の推定）。撮影時の水位や写真の正解を直接示すものではありません。</p>
+      <details id="historical-ground-pair"><summary>地上写真と近くの航空写真を比べる</summary>
+        <p>2015年9月11日の別の場所です。印は地上写真のEXIFから概算した撮影地点で、水の位置ではありません。地上写真の撮影方向・位置精度・時刻の時間帯と、航空写真の正確な時刻は不明です。画像の位置ずれや時刻差があり、同時・同じ対象を示す保証はありません。</p>
+        <div class="historical-flood-grid"><figure><img id="joso-ground-image" alt="2015年9月11日の地上写真。橋から川を望む。"><figcaption>防災科学技術研究所：地上写真（カメラ記録 11:27:05、時間帯不明）<br><span id="joso-ground-status" role="status">未取得</span></figcaption></figure><figure><div class="historical-image-frame"><img id="joso-ground-aerial" alt="2015年9月11日午後の国土地理院航空写真の一部。印は撮影地点の概算。"><span id="joso-ground-marker" class="historical-point" aria-hidden="true" hidden></span></div><figcaption>国土地理院：同日午後の航空写真（一部）<br>印：撮影地点の概算<br><span id="joso-ground-aerial-status" role="status">未取得</span></figcaption></figure></div>
+        <p id="joso-ground-pair-status" role="status" aria-live="polite">画像は未取得です。</p><button id="joso-ground-retry" type="button" hidden>取得に失敗した画像を再取得</button>
+        <p>川が見えることは住宅地の浸水や安全の正解ではありません。画像の空白や欠けも安全を示しません。過去の参考資料であり、現在の浸水・飛行安全には使えません。画像をMuseへ自動送信しません。</p>
+        <p><a href="https://ecom-plat.jp/nied-cr/index.php?gid=10132" target="_blank" rel="noopener noreferrer">防災科学技術研究所：写真と利用条件 ↗</a> · <a href="https://creativecommons.org/licenses/by/2.1/jp/" target="_blank" rel="noopener noreferrer">CC BY 2.1 JP ↗</a> · <a href="https://www.gsi.go.jp/BOUSAI/H27.taihuu18gou.html" target="_blank" rel="noopener noreferrer">国土地理院：航空写真の資料 ↗</a></p>
+      </details>
+      <p><a href="https://www.dpri.kyoto-u.ac.jp/news/6105/" target="_blank" rel="noopener noreferrer">京都大学：現地調査と推定の第二報 ↗</a> · <a href="https://ecom-plat.jp/nied-cr/group.php?gid=10129" target="_blank" rel="noopener noreferrer">防災科研：常総市の現地調査 ↗</a></p>
+      <details><summary>写真範囲に近い別の現地調査を見る</summary><p>防災科研の2015年9月19日の調査報告では、表2の67〜69番の緯度経度を地図タイルに概算すると、写真の範囲内です。測地系・地点の精度と写真の位置ずれは未確認です。後日の浸水痕跡であり、写真撮影時の浸水を示しません。資料の利用条件は写真とは別に確認してください。</p><p><a href="https://nied-repo.bosai.go.jp/record/712/files/1606_22_1.pdf" target="_blank" rel="noopener noreferrer">防災科研：2015年の現地調査報告（表2） ↗</a></p></details>
+      <p>防災科研の地図には午後、別の資料案内には航空写真を午前とあります。対象画像の関係と撮影時刻は未確認です。以前の確認記録も見直してください。</p><p><a href="https://map03.ecom-plat.jp/map/map/?cid=20&amp;gid=524&amp;mid=2251" target="_blank" rel="noopener noreferrer">防災科研の地図 ↗</a> · <a href="https://ecom-plat.jp/nied-cr/index.php?action=view&amp;blockdoc_id=250&amp;eid=10639&amp;gid=10129&amp;module=blockdoc" target="_blank" rel="noopener noreferrer">防災科研の資料案内 ↗</a></p>
+      <div id="historical-review-joso"></div>
+    </dialog>
+    <details id="map-legend" class="map-legend"><summary>地図の見方</summary><ul><li><span class="legend-mark legend-facility" aria-hidden="true"></span><span><b>公開施設</b><small>開設・受け入れは未確認</small></span></li><li><span class="legend-mark legend-selected" aria-hidden="true"></span><span><b>選択した施設</b><small>色は選択状態を示します</small></span></li><li><span class="legend-mark legend-flood" aria-hidden="true"></span><span><b>洪水の想定区域</b><small>現在の浸水範囲ではありません。色は想定深さと背景によって変わります。</small></span></li><li><span class="legend-mark legend-drone" aria-hidden="true"></span><span><b>仮想ドローン</b><small>水色：1号機／黄緑：2号機</small></span></li><li><span class="legend-mark legend-route" aria-hidden="true"></span><span><b>仮想の移動経路</b><small>当初はオレンジ破線、案Aは水色、案Bは紫</small></span></li><li><span class="legend-mark legend-hazard" aria-hidden="true">!</span><span><b>仮想障害・点検</b><small>？は不明、点検間の安全も未確認</small></span></li></ul><p>色・線種・文字を併用しています。</p></details>
+    <p id="map-quick-help" class="map-quick-help">施設の一覧や地図の設定は「情報を表示」から開けます。</p>
+    <div id="tutorial-overlay" class="tutorial-overlay" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" hidden>
+      <div class="tutorial-card">
+        <p id="tutorial-count" class="tutorial-count" role="status" aria-live="polite">1 / 3</p>
+        <h2 id="tutorial-title">実地図の仮想配送を試す</h2>
+        <p id="tutorial-text">地域→配送先→出発地点→開始の順に一段階ずつ選びます。実際の飛行ではなく仮想の演出です。</p>
+        <p id="tutorial-note" class="tutorial-note">航空写真は現在の映像ではありません。洪水は想定です。</p>
+        <div class="tutorial-row"><button id="tutorial-back" type="button">戻る</button><button id="tutorial-next" type="button">次へ</button><button id="tutorial-skip" type="button">スキップ</button></div>
+      </div>
+    </div>
+    <div id="mini-ops" class="mini-ops" aria-label="仮想便の小型操作" hidden>
+      <p id="mini-status" role="status" aria-live="polite">待機中</p>
+      <p id="mini-fleet" role="status" aria-live="polite" hidden></p>
+      <p id="mini-consult-notice" role="status" aria-live="polite" hidden></p>
+      <div class="mini-row"><button id="mini-stop" type="button">移動を終了</button><button id="mini-consult" type="button" hidden>Museに相談</button><button id="mini-detour" type="button" hidden>仮想案Aを再生</button><button id="mini-expand" type="button">詳しい情報を表示</button></div>
+    </div>
+    <section id="fleet-hud" class="fleet-hud" aria-label="仮想配送の進行状況" hidden>
+      <ol class="fleet-progress" aria-label="配送の進行段階">
+        <li id="fleet-progress-0">依頼確認</li><li id="fleet-progress-1">出発</li><li id="fleet-progress-2">障害共有</li><li id="fleet-progress-3">経路相談</li><li id="fleet-progress-4">再点検</li><li id="fleet-progress-5">配送・結果</li>
+      </ol>
+      <div class="fleet-brief" aria-live="polite"><strong>仮想配送 <small>シミュレーション</small></strong><p id="fleet-brief-area"></p><p id="fleet-brief-cargo"></p><p id="fleet-brief-status"></p><p id="fleet-roles">偵察・中継：仮想シナリオ</p><p id="fleet-model-status">代表機の3Dモデルを確認中</p><p id="fleet-brief-reason" hidden></p><p id="fleet-language-note" class="language-note" hidden>Muse replies may be in Japanese.</p></div>
+      <section id="decision-card" class="decision-card" aria-label="判断の根拠" hidden>
+        <strong>判断の根拠</strong>
+        <div><span>仮想の共有情報</span><p id="decision-share"></p></div>
+        <div><span>相談の提案</span><p id="decision-reply"></p></div>
+        <div><span>アプリの判断</span><p id="decision-verdict"></p></div>
+        <details><summary>点検と画像を見る</summary><p id="decision-input"></p><img id="decision-image" alt="地図画像（送信対象）" hidden><p id="decision-reply-full"></p><p id="decision-checks"></p><p id="decision-baseline"></p><p id="decision-time"></p><small>点検地点の間・電線・現地の安全は未確認。</small></details>
+      </section>
+      <div class="fleet-bottom"><p id="fleet-hud-count" role="status" aria-live="polite"></p><div class="fleet-bottom-actions"><button id="fleet-view-wide" type="button" aria-pressed="true">街全体</button><button id="fleet-view-follow" type="button" aria-pressed="false">機体を追跡</button><button id="fleet-hud-details" type="button" aria-expanded="false" aria-controls="large-fleet-dock">交信履歴・根拠</button><button id="fleet-hud-stop" type="button">全機を停止</button></div></div>
+    </section>
+    <section id="large-fleet-dock" class="large-fleet-dock" aria-label="100機の仮想配送状況" hidden>
+      <div class="large-fleet-head"><strong>100機の仮想配送</strong><span id="large-fleet-count" role="status">準備中</span></div>
+      <p class="large-fleet-legend"><span class="fleet-check">●</span>確認中　<span class="fleet-wait">●</span>待機　<span class="fleet-move">●</span>移動中　<span class="fleet-hold">●</span>相談待ち　<span class="fleet-drop">●</span>荷下ろし　<span class="fleet-done">●</span>終了　<span class="fleet-stop">●</span>停止</p>
+      <p id="large-fleet-sharing" role="status" aria-live="polite">共有：機体と施設ごとの点検結果を確認中。</p>
+      <p id="large-fleet-cargo" role="status" aria-live="polite" hidden></p>
+      <section id="large-fleet-approval" class="large-fleet-approval" aria-labelledby="large-fleet-approval-title" hidden>
+        <strong id="large-fleet-approval-title">配送先の変更を確認</strong>
+        <p id="large-fleet-approval-text" role="status" aria-live="polite"></p>
+        <div class="large-fleet-actions"><button id="large-fleet-approve" type="button">仮想変更を承認</button><button id="large-fleet-decline" type="button">変更せず停止</button></div>
+      </section>
+      <p id="large-fleet-stopped-reason" role="status" hidden></p>
+      <details class="large-fleet-events"><summary>共有と相談の履歴を見る</summary><ol id="large-fleet-events"><li>共有と判断の記録はまだありません。</li></ol></details>
+      <label class="large-fleet-select">機体を選ぶ <select id="large-fleet-select" aria-label="状態を確認する機体"></select></label>
+      <p id="large-fleet-detail" role="status">地図上の点、または一覧から機体を選んでください。</p>
+      <p id="large-fleet-note" role="status" aria-live="polite">仮想配送。点検した地点の間、電線・機体間の安全・現地の受入は未確認。</p>
+      <div class="large-fleet-actions"><button id="large-fleet-stop" type="button">全機を停止</button><button id="large-fleet-retry" type="button" hidden>結果の保存を再試行</button><button id="large-fleet-pending-export" type="button" hidden>未保存の結果を書き出す</button><button id="large-fleet-pending-discard" type="button" hidden>未保存の結果を破棄</button><button id="large-fleet-info" type="button">詳しい情報を表示</button></div>
+    </section>
+  </section>
+  <aside id="simulation-panel" class="panel">
+    <div class="panel-heading"><div><p class="overline">MISSION CONTROL</p><h2>配送オペレーション</h2></div><span class="number">01<span>/01</span></span></div>
+    <div class="notice"><span aria-hidden="true">●</span> <div role="status" aria-live="polite" aria-atomic="true"><strong id="status-title">シミュレーション待機中</strong><small id="status-detail">Muse未接続・試作の判断を使用します</small></div></div>
+    <p class="hint">仮想の街と会話による演出です。実際の飛行の安全や配送の可否は判断できません。</p>
+    <div class="notice realmap-entry"><span aria-hidden="true">●</span><div><strong>実地図の調査画面</strong><small>公開データの施設・浸水想定と複数機の仮想配送を試せます。最初は仮想配送モードです。</small><button id="enter-realmap" class="area-load" type="button">実地図を見る</button></div></div>
+    <div class="section-head"><span>01</span><h3>ミッションを依頼</h3><span class="smalltag">COMMAND</span></div>
+    <label class="sr-only" for="command">配送の依頼</label><textarea id="command" rows="2" maxlength="500">避難所Aに水と救援物資を届けて</textarea>
+    <p class="hint">Muse接続時、依頼文と仮想の街の画像をMetaへ送信します。氏名・電話番号などは入力しないでください。音声入力は文字起こしのため録音をMetaへ送ります。</p>
+    <p class="hint">配送先：避難所A ／ 荷物：1箱（固定）</p>
+    <div class="action-row"><button id="voice" class="outline" type="button"><span aria-hidden="true">◉</span> 音声で依頼</button><button id="start" class="primary" type="button" disabled>配送を開始 <span>↗</span></button></div>
+    <p class="hint" id="voice-note">音声入力にはMuseへの接続が必要です。テキストでも依頼できます。</p>
+    <div class="section-head comm-head"><span>02</span><h3>AI 通信</h3><button id="history-toggle" class="history-toggle" type="button" aria-expanded="false" aria-controls="radio">履歴を見る</button></div>
+    <div class="radio-head"><span><i></i> CHANNEL OPEN</span><button id="sound" type="button" aria-pressed="false">音声 OFF</button></div>
+    <div class="radio" id="radio" role="log" aria-live="polite" hidden><div class="empty"><span>◌</span><p>通信はここに表示されます</p><small>MISSION CONTROL STANDING BY</small></div></div>
+    <div class="section-head plan-head"><span>03</span><h3>配送状況</h3><span class="smalltag">ROUTE DATA</span></div>
+    <div class="progress-row"><div><span class="label">CURRENT PLAN</span><strong id="plan-name">作戦待ち</strong></div><span class="plan-indicator" id="plan-indicator">—</span></div>
+    <div class="original-plan"><span>当初の作戦</span><strong id="original-plan">未決定</strong></div>
+    <div class="meter"><span id="progress"></span></div>
+    <div class="mission-stats"><div><small>配送</small><strong id="delivery">0 / 1</strong></div><div><small>機体</small><strong>DRONE 01</strong></div><div><small>障害</small><strong id="hazard">未発生</strong></div></div>
+    <button id="reset" type="button" class="reset">↺ &nbsp; ミッションをリセット</button>
+    <footer><span>◈ MUSE MISSION</span><span>VIRTUAL SIMULATION ONLY</span></footer>
+  </aside>
+  <aside id="map-panel" class="panel map-panel" hidden aria-label="実地図のデータ情報">
+    <p class="overline">REAL MAP / DATA EXPLORER</p>    <h2 id="map-panel-title">荒川区の地図と防災情報</h2>
+    <div class="map-primary" id="map-primary">
+    <section class="first-use-flow" aria-label="はじめての手順と現在の進捗" style="border:1px solid #2a4a52; background:#0f232b; padding:10px 12px; margin:10px 0;">
+      <div class="flow-strip" aria-label="配送シミュレーションの準備状況"><span id="flow-region" class="done">1 地域</span><span id="flow-shelter">2 配送先</span><span id="flow-origin">3 出発地点</span><span id="flow-sim" style="opacity:0.7">4 仮想配送</span></div>
+      <p id="flow-hint" class="flow-hint" role="status" aria-live="polite">まず配送先を選びます。</p>
+      <div id="stage-guide" class="stage-guide" aria-label="一段階ずつの選択">
+        <ol class="stage-steps" aria-label="選択の段階">
+          <li><button id="stage-tab-1" type="button" data-stage="1" aria-current="step">1 地域</button></li>
+          <li><button id="stage-tab-2" type="button" data-stage="2">2 配送先</button></li>
+          <li><button id="stage-tab-3" type="button" data-stage="3">3 出発地点</button></li>
+          <li><button id="stage-tab-4" type="button" data-stage="4">4 開始</button></li>
+        </ol>
+        <p id="stage-desc" class="stage-desc" role="status" aria-live="polite">地域を選びます。初期選択のまま次へ進めます。</p>
+        <p id="stage-error" class="stage-error" role="alert" hidden></p>
+      </div>
+      
+      <ol class="quick-flow" aria-label="すぐに操作する手順">
+        <li><p class="quick-head"><span>1</span> 地域</p>
+          <div class="area-quick" role="group" aria-label="地域を選ぶ"><button id="quick-13118" type="button" aria-pressed="true"><img src="https://cyberjapandata.gsi.go.jp/xyz/std/14/14553/6448.png" alt="" loading="lazy"><span>荒川区</span></button><button id="quick-13101" type="button" aria-pressed="false"><img src="https://cyberjapandata.gsi.go.jp/xyz/std/14/14552/6450.png" alt="" loading="lazy"><span>千代田区</span></button><button id="quick-13106" type="button" aria-pressed="false"><img src="https://cyberjapandata.gsi.go.jp/xyz/std/14/14553/6449.png" alt="" loading="lazy"><span>台東区</span></button></div><small class="area-credit">各地域付近の地図：国土地理院</small>
+        </li>
+        <li><p class="quick-head"><span>2</span> 配送先</p>
+          <label class="area-choice">施設一覧 <select id="shelter-select" disabled><option value="">施設の取得を待っています</option></select></label>
+      <button id="focus-shelter" class="area-load" type="button" hidden>選んだ施設を地図で見る</button>
+      <p id="shelter-list-status">施設情報を取得中です。</p><p id="draft-destination">配送先候補：施設一覧または地図のオレンジの点から選択してください。</p>
+        </li>
+        <li><p class="quick-head"><span>3</span> 出発地点</p>
+          <button id="choose-origin" class="area-load" type="button" disabled>地図を押して出発地点を選ぶ</button>
+      <p id="map-origin">出発候補地点：未選択</p><p id="map-distance">施設を選ぶと直線距離を表示します。飛行経路ではありません。</p>
+        </li>
+        <li><p class="quick-head"><span>4</span> 開始</p>
+          <label class="area-choice">配送する機体数 <select id="fleet-size"><option value="100" selected>100機で複数の施設へ</option><option value="2">2機で配送</option></select></label>
+      <p id="fleet-size-note">物資・数量を指定すると、選んだ施設への依頼として確認してから開始します。指定しない場合は最大5施設への内容未指定の仮想便です。仮想障害後、地図画像（地名を含む場合があります）と点検の集計をMetaのMuseへ送って相談します。未接続や点検不明の場合、影響機は停止します。</p>
+          <label class="area-choice">2号機の配送先 <select id="fleet-select" disabled><option value="auto">自動で選ぶ（出発地点と施設の選択後）</option></select></label>
+          <p id="fleet-preview">2号機の配送先は、出発地点と施設を選ぶと表示します。</p>
+          <details class="compact-details"><summary>地図画像（地名を含む場合あり）と点検結果をMetaに送る場合があります。詳細</summary><p id="map-sim-auto-notice" class="auto-notice">開始後の自動送信：仮想障害で停止後、街全体の地図画像とA/B案の点検数値（点数・取得数・不明数・高い表面数・最大間隔）をMetaへ送り自動で判断する場合があります（上限60秒・取消可）。画像に地名・地点が含まれる場合があります。旧サーバー・未接続では自動送信しません。</p></details><p id="map-building-start-status" role="status" aria-live="polite" hidden></p><button id="map-sim-start" class="area-load sim-primary" type="button" disabled>▶ 仮想移動を開始</button>
+        </li>
+      </ol>
+      <div class="stage-row"><button id="stage-back" class="area-load" type="button">戻る</button><button id="stage-next" class="area-load" type="button">次へ</button></div>
+      <p class="hint" style="margin:4px 0 0; font-size:12px; color:#b7c8d0;">仮想の街と会話による演出です。実際の飛行の安全や配送の可否は判断できません。データ種別・不明・非実飛行の注意は各項目に表示します。</p>
+    </section>
+          <p id="large-fleet-previous" role="status" hidden></p>
+          <details id="large-fleet-previous-details" hidden><summary>前回の共有と相談を確認</summary><p id="large-fleet-previous-events"></p><section id="fleet-comparison-review" hidden><p>定型案は点検数値を使います。相談先には地図画像も送るため、入力は同一ではありません。回答の出所は記録をご確認ください。判断は振り返り用で、仮想便を変更しません。</p><div id="fleet-comparison-review-history"></div><form id="fleet-comparison-review-form"><label>自分の振り返り <select id="fleet-comparison-review-choice" required><option value="">選択してください</option><option value="muse">相談の案を参考にする</option><option value="baseline">定型案を参考にする</option><option value="hold">どちらも保留する</option><option value="undecided">判断できない</option></select></label><label>理由（任意） <select id="fleet-comparison-review-reason"><option value="">指定しない</option><option value="missing_data">情報不足</option><option value="outdated_data">情報が古い</option><option value="conflicting_data">情報の食い違い</option><option value="needs_review">追加確認が必要</option><option value="other">その他</option></select></label><label>メモ（任意・200文字以内） <textarea id="fleet-comparison-review-note" maxlength="200" rows="2"></textarea></label><p>氏名・連絡先は入力しないでください。記録は端末内に保存され、書き出しにも含まれます。</p><button type="submit">振り返りを保存</button><button id="fleet-comparison-review-reset" type="button">入力を消して再確認</button></form><p id="fleet-comparison-review-status" role="status" aria-live="polite"></p></section></details>
+          <details><summary>仮想配送記録の管理</summary><p>端末には最大20件保存します。ファイルには施設名・位置・経路・相談内容が含まれるため、共有に注意してください。</p><p>同じアドレスの他の画面も最新版に更新してください。</p><button id="large-fleet-history-export" type="button">記録を書き出す</button><button id="large-fleet-history-delete" type="button">保存済み記録をすべて削除</button><p id="large-fleet-history-status" role="status" aria-live="polite"></p></details>
+    <div id="map-sticky-state" class="sticky-state" hidden><p id="map-guide-live" class="guide-live" role="status" aria-live="polite" aria-atomic="true" hidden></p><button id="map-sim-stop" class="area-load" type="button" disabled>移動を終了</button></div>
+    </div>
+    <div class="map-secondary" id="map-secondary">
+    <p class="area-list-status" style="font-weight:600; color:#ffedb3;">背景と建物と雨雲は実際の災害状況ではありません。不明な場合は「取得中」「未確認」と表示します。</p>
+    <details class="map-details"><summary>地図の見た目を変える（背景・建物・雨）</summary>
+    <div class="area-quick map-basemap" role="group" aria-label="背景の種類"><button id="basemap-standard" type="button" aria-pressed="false" disabled>地図</button><button id="basemap-photo" type="button" aria-pressed="true" disabled>航空写真</button><button id="basemap-plateau" type="button" aria-pressed="false" disabled>PLATEAU写真</button></div>
+    <p id="photo-note" class="area-list-status">撮影時期は場所ごとに異なり未確認。現在の災害状況ではありません。取得できない場所や広域では国土地理院の写真や地図を表示します。 <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">出典：国土地理院</a> <a id="plateau-photo-credit" href="https://docs.plateauview.mlit.go.jp/datasets/ortho/" target="_blank" rel="noopener" hidden>出典：国土交通省 PLATEAU</a><br><span id="photo-base-status" role="status" aria-live="polite"></span></p>
+    <div class="area-quick map-basemap" role="group" aria-label="建物モデルの種類"><button id="buildings-detailed" type="button" aria-pressed="true" disabled>建物：詳細優先</button><button id="buildings-highest" type="button" aria-pressed="false" disabled>建物：高精細（試験）</button><button id="buildings-simple" type="button" aria-pressed="false" disabled>建物：簡易形状</button></div>
+    <p class="area-list-status">詳細優先はLOD2以下、高精細はLOD3以下で地域ごとの利用可能な最大詳細度を表示します。高精細では一部の建物だけになる場合や、LOD2以下と同じ場合があります。写真がない建物もあり、現地の完全な再現ではありません。見やすさのため日照を昼間に固定しています。建物モデル種別の切替で施設・出発地点と仮想便がリセットされます。</p>
+    <div class="lod2-light">
+    <label><input id="lod2-light-toggle" type="checkbox" disabled> 暗い写真建物を見やすくする（詳細優先LOD2のみ）</label>
+    <button id="lod2-light-apply" type="button" disabled>選択を反映（現在地域を再取得）</button>
+    <p id="lod2-light-status" role="status" aria-live="polite"></p>
+    <p class="area-list-status">反映で現在地域を再取得します。再取得で施設・拠点・仮想便が消えます。LOD3の見た目は変えません。人工的な明るさで実際の天候を示しません。</p>
+    </div>
+    <button id="example-detailed-city" class="area-load" type="button" disabled>台東区の高精細な街を試す</button>
+    <p class="area-list-status">台東区と高精細モデルに切り替えます。写真付き建物は一部です。施設・出発地点・仮想便はリセットされ、洪水想定図の表示設定は維持します。</p>
+    <label class="risk-toggle"><input id="risk-toggle" type="checkbox" checked> 洪水浸水想定区域を重ねる</label>
+    <label class="risk-opacity-label" for="risk-opacity">洪水想定の濃さ <output id="risk-opacity-value" for="risk-opacity">28%</output></label><input id="risk-opacity" type="range" min="10" max="80" step="1" value="28" aria-describedby="risk-opacity-note"><small id="risk-opacity-note">地図の色は背景と混ざります。色がない場所も安全とは限りません。</small>
+    <label class="risk-toggle"><input id="water-toggle" type="checkbox" disabled> 施設周辺に仮想の水面を表示</label><p class="area-list-status">選んだ施設付近に円形の水面を描く演出です。浸水範囲・深さの予測ではなく、AIへの画像と建物の高さ点検には含めません。</p>
+    <label class="risk-toggle"><input id="rain-toggle" type="checkbox" disabled> 雨雲の解析を重ねる</label>
+    <div id="rain-details" class="rain-details" hidden><p id="rain-status" role="status" aria-live="polite">雨雲の解析は非表示です。</p><p>灰色は欠測・取得失敗。広域の縮尺では雨雲を表示しないため灰色になります。雨雲は半透明のため、背景によって凡例と色が異なります。色のない場所も雨がないと断定できません。洪水や上空の風は分かりません。</p><img src="https://www.jma.go.jp/bosai/nowc/images/legend_jp_normal_hrpns.svg" alt="降水強度の凡例、単位は1時間あたりミリメートル" width="80" height="196"><p><a href="https://www.jma.go.jp/bosai/nowc/" target="_blank" rel="noopener noreferrer">出典：気象庁 雨雲の動き</a></p></div>
+    </details>
+    <section class="source-overview" aria-labelledby="source-overview-heading"><h3 id="source-overview-heading">いま見ている情報</h3><ul id="source-overview-list"><li>データの取得状態を確認中です。</li></ul><p>想定図の取得失敗履歴は地域変更前を含みます。取得した資料は現場の安全や施設の受入を示しません。</p></section>
+    <section class="flow-section" aria-labelledby="area-heading"><h3 id="area-heading"><span>1</span> 地域を選ぶ</h3>
+    <p>まず試せる3地域。地域を切り替えると、選んだ施設と出発地点・仮想便はリセットされます。</p>
+    
+    <details class="map-details"><summary>ほかの地域を探す</summary>
+    <label class="area-choice">地域一覧 <select id="area-select"><option value="13118">東京都荒川区</option><option value="13101">東京都千代田区</option><option value="13106">東京都台東区</option></select></label>
+    <button id="load-areas" class="area-load" type="button">全国の公開地域を読み込む（約10 MB）</button>
+    <label id="area-search-label" class="area-choice" hidden>地域名で絞り込む<input id="area-search" type="search" placeholder="例：札幌市、渋谷区"></label>
+    <label id="area-texture-label" class="risk-toggle" hidden><input id="area-texture-filter" type="checkbox"> 外観テクスチャ付き建物が一覧にある地域</label><p id="area-texture-note" class="area-list-status" hidden>最新年度の公開一覧にLOD2・3の外観付きデータがある地域です。一部の建物だけの場合や、選択した表示方法では見えない場合があります。選択中の地域は絞り込み中も残します。</p>
+    <p id="area-list-status" class="area-list-status">初期表示は3地域。公開データがない地域は一覧に出ません。</p>
+    <button id="refresh-data" class="area-load" type="button" disabled>この地域の情報を再取得（視点が戻ります）</button></details></section>
+    <div class="notice"><span>●</span><div><strong>実データを使った調査画面</strong><small>配送・飛行ルートの安全性は未検証です。</small></div></div>
+    <section class="flow-section" aria-labelledby="destination-heading"><h3 id="destination-heading"><span>2</span> 配送先を選ぶ</h3>
+      <details class="map-details"><summary>施設を名前・住所で絞り込む</summary><label class="area-choice">施設名・住所<input id="shelter-search" type="search" placeholder="例：学校、町屋"></label></details>
+      
+      <div id="nearby-shelters" class="nearby-shelters" hidden><strong>出発地点から近い施設候補</strong><p>取得済みの候補を地表の直線距離順に表示。開設・受入や飛行経路は未確認です。</p><ul id="nearby-shelter-list"></ul></div>
+      
+      
+      <div class="shelter-flood"><strong>選択施設の洪水想定（参考）</strong><p id="shelter-flood-status" role="status" aria-live="polite">施設を選ぶと公開座標の想定図を確認します。</p><small>公開座標の1地点を着色から読み取ります。データ更新時期は未確認。位置の誤差・未着色・未提供があり、施設全体や現在の浸水を示しません。<a href="https://disaportal.gsi.go.jp/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">出典：ハザードマップポータル</a></small></div>
+      <div class="shelter-flood"><strong>近隣アメダスの観測（速報）</strong><p id="map-observation-status" role="status" aria-live="polite">観測所の情報を取得中</p><button id="map-observation-view" class="area-load" type="button" hidden>観測所と基準地点を地図で見る</button><small>地図の線は基準地点と観測所を結ぶ直線で、飛行経路ではありません。施設の公開座標、未選択時は建物モデルの範囲中心から30km以内の観測所です。観測所の地上の値であり、施設や上空の実測ではありません。<a href="https://www.jma.go.jp/bosai/amedas/" target="_blank" rel="noopener">出典：気象庁</a></small></div>
+      <div id="map-picked" class="sr-only">地図上のオレンジの点からも選べます。</div>
+    </section>
+    <section class="flow-section" aria-labelledby="origin-heading"><h3 id="origin-heading"><span>3</span> 出発地点を選ぶ</h3>
+      
+    </section>
+    <details class="map-details extra-details" open><summary>音声や文字で物資を伝える（任意・配送の前に推奨） — 下書きは端末内のみ</summary>
+    <div class="map-caveat" aria-labelledby="request-draft-heading">
+      <strong id="request-draft-heading">物資依頼の確認票（試作）</strong>
+      <p>この画面内だけの下書きです。救援機関への送信・受付・共有は行われません。名前や連絡先は入力しないでください。</p>
+      <label class="area-choice">依頼内容（確認・修正できます）<textarea id="draft-transcript" rows="2" maxlength="500" placeholder="例：水を12箱届けて"></textarea></label>
+      <button id="draft-voice" class="area-load" type="button">◉ 音声を文字にする</button>
+      <p id="draft-voice-status" role="status" aria-live="polite">録音した音声は文字起こしのためMetaへ送信します。個人情報は話さないでください。</p>
+      <p id="draft-suggestion" role="status" aria-live="polite">文章から物資と箱数の候補を確認できます。</p>
+      <button id="draft-apply" class="area-load" type="button" hidden>候補を物資と数量に反映</button>
+      <p id="draft-shelter-suggestion" role="status" aria-live="polite">文章の施設名と、選択地域の公開施設を照合できます。</p>
+      <button id="draft-shelter-apply" class="area-load" type="button" hidden>この施設を配送先に選ぶ</button>
+      <label class="area-choice">物資 <select id="draft-supply"><option value="">選択してください</option><option value="water">飲料水</option><option value="food">食料</option><option value="blanket">毛布</option><option value="hygiene">衛生用品</option></select></label>
+      <label class="area-choice">数量（箱） <input id="draft-quantity" type="number" min="1" max="10000" step="1" inputmode="numeric" placeholder="例：12"></label>
+      <p>候補は文章の簡単な照合で作り、自動では反映しません。音声では施設名や箱数を聞き間違えることがあります。反映前に内容を確認してください。2機の配送は1号機に1箱、100機の配送は1機に1箱を割り当てます。</p>
+      <p id="draft-summary" role="status" aria-live="polite">下書き・未送信。物資・数量・施設の選択が必要です。</p>
+      <p>施設の受入、在庫、配送方法、飛行の可否は未確認です。再読み込みすると下書きは消えます。</p>
+      <button id="save-brief" class="area-load" type="button">現在の確認メモを保存</button><p>依頼文・施設候補・未確認事項をこの端末に保存します。送信や受付は行いません。</p>
+    </div></details>
+    <div class="map-caveat"><strong>ソラとナギに地図・物資を相談（試験）</strong>
+      <p>上の「物資の依頼」から音声または文字を確認し、物資と箱数を選べます。選択しなくても相談できます。</p>
+      <p id="consult-input">送信する物資：未指定 ／ 数量未指定</p>
+      <p id="consult-flood-input">施設座標の洪水想定を送信できるか確認中です。</p>
+      <label><input id="consult-use-observation" type="checkbox" autocomplete="off" disabled> 近隣の気象観測もMetaへ送る（任意）</label><p id="consult-observation-input" role="status" aria-live="polite">観測情報の送信対応を確認中です。</p><p id="consult-observation-consent-status" role="status" aria-live="polite"></p>
+      <label><input id="consult-use-field" type="checkbox" autocomplete="off" disabled> 選択施設の人による現地報告もMetaへ送る（任意）</label><p id="consult-field-input" role="status" aria-live="polite">現地報告の送信対応を確認中です。</p><p>人の報告は未検証です。水が見えなかったとの報告は安全を意味しません。期限が切れた報告は送りません。</p>
+      <label><input id="consult-use-facility" type="checkbox" autocomplete="off" disabled> 選択施設の受け入れ報告もMetaへ送る（任意）</label><p id="consult-facility-input" role="status" aria-live="polite">施設報告の送信対応を確認中です。</p><p>施設の報告は未検証です。条件付きの具体的な条件文や連絡先は送らず、実際の受け入れは再確認が必要です。</p><p id="consult-report-consent-status" role="status" aria-live="polite"></p>
+      <label><input id="consult-use-infrastructure" type="checkbox" autocomplete="off" disabled> この地域の設備報告をMetaへ送る（任意）</label><p id="consult-infrastructure-input" role="status" aria-live="polite">設備報告の送信対応を確認中です。</p><p>場所や確認先の文章は設備報告として送らないため、報告と経路・施設の関係は不明です。地図画像には地点が映る場合があります。</p>
+      <label><input id="consult-use-bulletin" type="checkbox" autocomplete="off" disabled> 開いた洪水予報の電文もMetaへ送る（任意）</label><div id="consult-bulletin-input" role="status" aria-live="polite">送信できる電文を確認中です。</div><p id="consult-bulletin-consent-status" role="status" aria-live="polite"></p><p>電文と選択施設の対応は未確認です。「現況」は電文の時点であり、現在の施設の浸水や飛行の安全ではありません。</p><p>取得から2時間は送信の目安であり、公式の有効期限ではありません。後続の情報も公式サイトで確認してください。</p>
+      <p>押すと地図画像と上記の物資・箱数、対応時は洪水想定の区分をMetaへ送信します。仮想水面と2号機の方向矢印は画像から除きます。地名や地点が画像に含まれる場合があります。依頼文・施設名・住所は個別に送りません。</p>
+      <p>相談を中止したり失敗したりしても、送信済みの情報を取り消せるとは限りません。</p>
+      <p>地図は現場のライブ映像ではありません。文章は相談の分類・確認順からアプリが作成し、安全や飛行許可を判断しません。</p>
+      <p id="consult-refs-info" role="status">入力参照IDの送信に対応しているか確認中です。</p>
+      <button id="consult-map" class="area-load" type="button" disabled>地図画像と物資をMuseに相談</button>
+      <p id="consult-status" role="status" aria-live="polite">利用できる接続を確認中</p>
+      <div id="consult-result" hidden><p id="consult-result-age" role="status" hidden></p><p id="consult-time"></p><canvas id="consult-preview" aria-label="相談に送信した地図画像"></canvas><p>画像には地名や地点が含まれる場合があります。任意で保存し、共有に注意してください。</p><button id="consult-image-download" type="button">送信画像を保存（任意）</button><div id="map-radio" role="log" aria-live="polite"></div><details><summary>今回の送信内容と回答を見る</summary><div id="consult-audit"></div></details></div>
+      <div id="consult-unsaved" hidden><p id="consult-unsaved-message" role="status" aria-live="polite"></p><p>未保存の記録はこの画面を閉じたり再読み込みすると失われます。ファイルには地域コード・日時・物資・Museの回答が含まれます。</p><button id="consult-save-retry" type="button">この記録を再保存</button> <button id="consult-unsaved-export" type="button">未保存の記録をファイルに保存</button> <button id="consult-unsaved-discard" type="button">未保存の記録を破棄</button></div>
+      <details><summary>端末に保存した相談の根拠（最大20件）</summary><p>20件に達すると新しい記録は保存できません。以前の記録は自動削除しません。同じアドレスの他の画面も最新版に更新してください。</p><p>相談ごとに、自分の判断を時刻付きで記録できます。本人・権限は確認しておらず、飛行の承認や安全確認ではありません。</p><p>ファイルには地域コード・日時・物資・Museの回答・判断メモが含まれます。共有時は内容に注意してください。</p><button id="consult-audits-export" type="button">相談記録をファイルに保存</button><p id="consult-saved-status" role="status">保存された記録を確認中です。</p><div id="consult-saved-audits"></div></details>
+      <details><summary>過去の相談履歴（最大5件）</summary><p>過去の画像への提案と、当時の施設候補・送信内容です。現在の状況には使えません。再読み込みすると消えます。</p><div id="map-history"><p>履歴はまだありません。</p></div></details>
+    </div>
+    <section class="flow-section sim-flow" aria-labelledby="sim-heading"><h3 id="sim-heading"><span>4</span> 仮想配送を試す</h3>
+      <p>仮想高度に架空の電線を配置し、迂回を再生します。電線の位置や飛行経路は実際のものではありません。</p>
+      <p class="hint" style="background:#102a33; padding:6px 8px; border-left:3px solid #ff8b3d;">物資を伝えるには <a href="#draft-transcript" onclick="document.getElementById('draft-transcript').focus(); return false;">上の「音声や文字で物資を伝える」</a> で音声ボタンや文字入力を使い、物資と数量を選んでください。下書きは端末内のみで送信されません。</p>
+      
+      
+      <div class="shelter-flood"><strong>2つの施設候補の洪水想定（参考）</strong>
+        <dl class="fleet-flood-comparison" aria-label="施設候補の洪水想定"><div><dt>1号機</dt><dd id="fleet-flood-primary">施設未選択：未確認</dd></div><div><dt>2号機</dt><dd id="fleet-flood-second" role="status" aria-live="polite">施設未選択：未確認</dd></div></dl>
+        <button id="fleet-flood-retry" class="area-load" type="button" hidden>2号機の想定図を再確認</button>
+        <small>想定最大規模の図の着色を公開座標の1地点で確認します。更新時期は未確認。着色のない場所や取得失敗は浸水しないことを示しません。現在の浸水、施設全体、開設・受入は不明です。<a href="https://disaportal.gsi.go.jp/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">出典：ハザードマップポータル</a></small>
+      </div>
+      <p>1号機は選んだ施設、2号機は別の施設候補へ内容未指定の1箱を運びます。Muse相談は1号機のみ。仮想の機体中心が30m以内に近づく場合は2号機を中止します。この距離は演出用で、機体やケーブル、電線、実際の安全を判定するものではありません。「街全体」で2機を見渡せます。</p>
+      <p>出発前と仮想障害での停止後に、経路の一部を3D建物モデルで自動点検します。点と点の間や実際の電線・現場状況は確認できません。</p>
+      <p id="map-cargo-preview">物資を指定しない場合は、内容未指定の1箱として再生します。</p>
+      
+      <button id="map-sim-probe" class="area-load" type="button" hidden>3D建物モデルを再点検</button>
+      <button id="map-sim-consult" class="area-load" type="button" disabled>2つの仮想迂回案をMuseに相談</button>
+      <button id="map-sim-detour" class="area-load" type="button" disabled>仮想の迂回を再生</button>
+      <button id="map-sim-alternate" class="area-load" type="button" hidden>もう一方の仮想案を再生</button>
+      
+      <p id="map-sim-manifest" role="status" aria-live="polite" hidden></p>
+      <p id="map-sim-status" role="status" aria-live="polite">出発地点と施設を選んでください。</p>
+      <p id="map-probe-status" role="status" aria-live="polite" hidden>3Dモデルの点検は未実施です。実際の建物・電線や点と点の間は未確認です。</p>
+      <p id="map-probe-legend" hidden>地図の記号：● 高さを取得　？ 取得できず　！ 仮想高度付近・それ以上。破線は仮想の経路で、点検地点の間は未確認です。●は安全を意味しません。高さ不明（道路・空地・未取得の区別不可）がある案は自動判断で停止します。同じデータの再点検では解消しない場合があります。</p>
+      <p id="map-probe-choice" role="status" aria-live="polite" hidden></p>
+      <p id="map-sim-privacy" hidden>街全体以外では先に街全体へ切り替え、もう一度押すと地名・地点が映り得る画像と、A/B案ごとの点検数値（点数・取得数・不明数・高い表面数・最大間隔）をMetaへ送ります。上限60秒で取り消せます。仮想障害の印は含み、電線の描画は除きます。実際の安全確認ではありません。再生できる案は点検結果に応じて変わります。点検完了後は自動で相談・判断します（旧サーバー・未接続を除く）。開始操作はこの送信を含みます。</p>
+      <p id="map-sim-consult-status" role="status" aria-live="polite" hidden>仮想障害で停止すると相談できます。</p>
+      <div id="map-sim-consult-result" hidden><canvas id="map-sim-preview" aria-label="Museに送った仮想迂回案の画像"></canvas><p id="map-sim-dialogue"></p></div>
+      <div class="map-team" aria-label="2機の点検共有と判断の記録">
+        <strong>2機の点検共有と判断（時系列）</strong>
+        <ol id="map-team-log" aria-label="共有と判断の時系列"><li>まだ共有と判断の記録はありません。</li></ol>
+        <p id="map-team-past" role="status" aria-live="polite" hidden></p>
+        <button id="map-team-export" type="button" hidden>この地域の2機の記録を保存</button><p id="map-team-export-status" role="status" aria-live="polite"></p>
+        <p>完了・停止の結果はこの端末に保存し、同じ地域で参考表示します。過去の成功は安全を意味しません。固定の案とMuseの回答は記録内で区別します。</p>
+      </div>
+      <details><summary>仮想迂回の相談履歴（最大5件）</summary><div id="map-sim-history"><p>履歴はまだありません。</p></div></details>
+    </section>
+    <details class="map-details extra-details"><summary>地図の危険情報・AI確認・出典を見る</summary>
+    <div class="map-caveat flood-key">
+      <strong>洪水浸水想定区域（想定最大規模）</strong>
+      <p id="map-risk-status">洪水の想定図を準備中</p>
+      <details><summary>色の意味・注意点を見る</summary>
+        <p>洪水の想定浸水深は6段階です。公式共通凡例の小さな枠（0.3m未満、0.5〜1m）は津波用の区分です。地図上では半透明で重ねるため、凡例と色が異なって見えます。</p>
+        <img src="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/img/shinsui_legend3.png" alt="公式の洪水・津波共通の浸水深凡例。洪水は0.5メートル未満、0.5〜3メートル、3〜5メートル、5〜10メートル、10〜20メートル、20メートル以上の6段階。内側の2区分は津波用。">
+        <p>想定図は現在の浸水を示しません。色がない場所も、未提供・取得失敗などがあり、安全とは判断できません。東京都では0.1メートル未満を着色していません。</p>
+        <p><a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank" rel="noopener">出典：国土地理院 オープンデータ配信・洪水浸水想定区域</a></p>
+      </details>
+    </div>
+    <div class="map-caveat"><strong>実配送の判断：<span id="readiness-state">判断不可</span></strong><ul id="readiness-reasons"><li>現地情報と飛行条件の確認が必要です。</li></ul></div>
+    <div class="map-caveat"><strong>Museに確認の順番を相談</strong><p>未確認項目の種類だけを送信します。地名・選択した座標は送信しません。提案は飛行許可や安全性の判断ではありません。</p><button id="review-checks" class="area-load" type="button" disabled>確認する順番を相談</button><p id="review-status" role="status" aria-live="polite">Museの接続設定を確認中</p><ol id="review-results"></ol></div>
+    <div class="map-caveat"><strong>SAMで地図画像を確認（試験）</strong>
+      <p>押すと地図画像をMetaへ送信します。仮想水面と2号機の方向矢印は画像から除きます。地名や選択した地点が画像に含まれる場合があります。依頼文は送りません。</p>
+      <p>3D都市モデルに実際の電線は網羅されていません。検出の有無から飛行の安全は判断できません。</p>
+      <button id="scan-map" class="area-load" type="button" disabled>地図画像の電線候補を確認</button><p id="scan-status" role="status" aria-live="polite">地図とMuseの接続を確認中</p>
+      <div id="scan-result" hidden><p id="scan-time">送信した画像とSAMの候補枠（撮影時点）</p><canvas id="scan-preview" aria-label="SAMに送信した地図画像と検出候補"></canvas></div>
+    </div>
+    <h3>地図に表示している情報</h3>
+    <p id="map-base-status">地理院地図を準備中</p>
+    <p id="map-buildings-status">3D建物を準備中</p>
+    <p id="map-shelters-status">洪水向け指定緊急避難場所を準備中</p>
+    <h3>気象庁の大雨情報</h3><p id="map-weather-status">情報を取得中</p><p>広域の大雨情報のみです。地域別の詳細や、土砂災害・風などは気象庁で確認してください。</p><p><a id="official-warning" href="https://www.jma.go.jp/bosai/warning/#area_type=class20s&amp;area_code=1311800" target="_blank" rel="noopener noreferrer">選択地域の警報・注意報を気象庁で確認</a></p>
+    <div class="map-caveat"><strong>情報の扱い</strong><p>想定区域は実際の浸水情報ではありません。施設の開設・受入状況、地形の標高、電線、気象や飛行規制はこの画面では確認できません。掲載がない場所にも施設が存在する可能性があります。</p><p id="map-fetch-time">取得時刻：未取得</p></div>
+    <div class="map-caveat"><strong>周辺の公式情報を開く</strong><p id="official-location">地域の位置を確認中です。</p><p>選択した施設、未選択の場合は建物モデルの範囲中心を表示します。リンクには概略の座標が含まれます。危険度分布は予測等に基づく情報で、現在の浸水の実測値ではありません。</p>
+      <div id="official-nearby" hidden><p><a id="official-inundation" target="_blank" rel="noopener noreferrer">気象庁 浸水キキクル</a><br><a id="official-flood" target="_blank" rel="noopener noreferrer">気象庁 洪水キキクル</a><br><a id="official-rain" target="_blank" rel="noopener noreferrer">気象庁 雨雲の動き</a></p></div>
+      <p><a href="https://www.river.go.jp/" target="_blank" rel="noopener noreferrer">川の防災情報（水位・雨量など）</a><br><a href="https://www.mlit.go.jp/koku/koku_tk10_000003.html" target="_blank" rel="noopener noreferrer">国土交通省 ドローンの飛行ルール</a></p></div>
+    <p class="map-sources">出典：<a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">国土交通省 PLATEAU</a>、<a href="https://www.gsi.go.jp/bousaichiri/hinanbasho.html" target="_blank" rel="noopener">国土地理院</a>、<a href="https://disaportal.gsi.go.jp/" target="_blank" rel="noopener">ハザードマップポータル</a>、<a href="https://www.jma.go.jp/bosai/warning/" target="_blank" rel="noopener">気象庁 防災情報</a></p>
+    </details>
+        </div>
+    <button id="map-back" class="reset" type="button">仮想配送に戻る</button>
+  </aside>
+</main><script type="module" src="app.js"></script>
+</body></html>
